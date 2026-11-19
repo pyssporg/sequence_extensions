@@ -180,3 +180,16 @@ tests/e2e/out/
 
 
 .seq_ext_gui/
+
+# GUI session directory and scratch output (.seq_ext_gui/ is per project root)
+sessions/
+
+# OS / editor residue
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~
+*.bak
+*.orig
+*.rej

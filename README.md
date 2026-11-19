@@ -1,6 +1,6 @@
 # sequence_extensions
 
-**Version:** 3.0.1 · **Python:** >=3.11
+**Version:** 3.1.0 · **Python:** >=3.11
 
 Higher-order function extensions for Python lists, dicts, and generators, plus a
 mini flow engine on dependency-graph futures: deterministic parallel campaigns,
@@ -33,6 +33,7 @@ See [docs/API.md](docs/API.md) for the full API reference.
 - [Installation](#installation)
 - [Quickstart](#quickstart)
 - [flow-runner](#flow-runner)
+- [GUI](#gui)
 - [Examples](#examples)
 - [Documentation](#documentation)
 - [Development](#development)
@@ -50,6 +51,14 @@ From source:
 
 ```
 pip install .
+```
+
+The base install has **zero runtime dependencies**: Python >= 3.11 and the
+standard library only. The optional `gui` extra adds FastAPI, jsonschema, and
+uvicorn for the local web GUI:
+
+```
+pip install "sequence-extensions-flow[gui]"
 ```
 
 The PyPI name `sequence-extensions` is held by an unrelated, older project
@@ -121,6 +130,24 @@ names a module to import, so treat it as trusted code.
 For Make, CI, and application-embedding recipes, see
 [docs/hpc-recipes.md](docs/hpc-recipes.md).
 
+## GUI
+
+`sequence-extensions-flow` also ships `seq_ext_gui`, a local, offline web GUI
+(behind the optional `gui` extra): preview a flow's dependency graph, edit plan
+parameters and run options, execute, and watch the run log stream. The GUI
+imports the engine; the engine never imports the GUI and stays zero-dependency.
+
+```bash
+./setup.sh                    # venv at .venv, both packages installed editable
+source .venv/bin/activate
+seq-ext-gui --project-root examples/flow_runner
+# open http://127.0.0.1:8765
+```
+
+See [docs/gui.md](docs/gui.md) for the walkthrough, options, and the wire
+contract, and [docs/gui-architecture.md](docs/gui-architecture.md) for the
+implementation narrative and subprocess protocol.
+
 ## Examples
 
 [`examples/`](examples/) is a hands-on tour of the library: one small,
@@ -158,15 +185,17 @@ output of each example.
 
 ## Development
 
-Editable install with dev extras:
+Editable install with dev extras (plus the GUI extra to run `seq-ext-gui` and
+its tests):
 
 ```bash
-pip install -e ".[dev]"
+pip install -e ".[dev,gui]"
 ```
 
-Run the suite with `pytest` (the 90% coverage floor is enforced) and lint with
-`ruff check .`. See [CONTRIBUTING.md](CONTRIBUTING.md) for the full test,
-coverage, lint, and format commands.
+Run the suite with `pytest` (the 90% coverage floor is enforced on the engine;
+the GUI suite is excluded from it) and lint with `ruff check .`. See
+[CONTRIBUTING.md](CONTRIBUTING.md) for the full test, coverage, lint, and format
+commands.
 
 ## License
 

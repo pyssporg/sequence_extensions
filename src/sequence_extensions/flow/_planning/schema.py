@@ -9,6 +9,8 @@ this function.
 
 from __future__ import annotations
 
+from .document import PLAN_SCHEMA
+
 __all__ = ["plan_schema"]
 
 _SCHEMA_ID = "https://github.com/pyssporg/sequence_extensions/schemas/flow-plan-2.schema.json"
@@ -200,7 +202,7 @@ def plan_schema() -> dict:
         "additionalProperties": False,
         "properties": {
             "schema": {
-                "const": "flow-plan/2",
+                "const": PLAN_SCHEMA,
                 "description": "Document schema marker.",
             },
             "parameters": {

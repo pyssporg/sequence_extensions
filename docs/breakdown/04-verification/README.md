@@ -24,4 +24,5 @@ How we know it is true: how each claim is checked, the acceptance criteria, and 
 <!-- GENERATED FILE — do not edit. Regenerate with pb-registers. -->
 - **INFO-006** [Test strategy](testing.md) — How the pytest suite verifies the package — run commands, per-area coverage, and claim verification
 - **INFO-014** [Stress-hardening findings and dispositions](stress-hardening-findings-and-dispositions.md) — Adversarial probes found two hangs, a process-mode wrong-function bug, and determinism/audit holes; every item is fixed or documented with a regression test
+- [gui-application](gui-application/README.md)
 <!-- pb:index:end -->

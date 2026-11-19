@@ -14,10 +14,10 @@ pull request.
    source .venv/bin/activate   # Windows: .venv\Scripts\activate
    ```
 
-3. Install the package in editable mode with dev dependencies:
+3. Install the package in editable mode with dev and GUI dependencies:
 
    ```bash
-   pip install -e ".[dev]"
+   pip install -e ".[dev,gui]"
    ```
 
 4. (Optional) Install the pre-commit hooks:
@@ -33,11 +33,18 @@ pull request.
 pytest
 ```
 
-Bare `pytest` works because `pythonpath` is configured in `pyproject.toml`.
-Run tests with coverage (the project enforces a 90% coverage floor):
+Bare `pytest` works because `pythonpath` is configured in `pyproject.toml`. It
+runs the engine suite under `tests/` and the GUI suite under `tests/gui/`.
+Run engine tests with coverage (the engine enforces a 90% coverage floor):
 
 ```bash
-pytest --cov=sequence_extensions --cov-report=term-missing
+pytest tests --ignore=tests/gui --cov=sequence_extensions --cov-report=term-missing
+```
+
+GUI coverage is reported separately and is not gated:
+
+```bash
+pytest tests/gui --cov=seq_ext_gui --cov-report=term-missing
 ```
 
 For an HTML coverage report:

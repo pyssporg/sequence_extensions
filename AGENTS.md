@@ -39,6 +39,33 @@ deterministic policy, and a JSON-lines run log, local or at HPC.
   `flow-runner` CLI.
 - The run log is the executed truth of a run; re-running is a fresh run.
 
+### GUI
+
+- `src/seq_ext_gui/` holds the optional local web GUI: a FastAPI app, a
+  one-shot subprocess worker, and a vanilla-JS front end that previews and runs
+  `flow-plan/2` documents. It ships in the same distribution
+  (`sequence-extensions-flow`) behind the `gui` extra; its tests live in
+  `tests/gui/` and its sample project in `examples/imaginary_flow/`.
+- The dependency is one-way: the GUI imports the engine, the engine never
+  imports `seq_ext_gui`. Engine changes are their own work, not a GUI feature.
+- **Engine API only.** Call `plan_document`, `apply_override`, `execute_plan`,
+  `RunOptions`, `NodePolicy`, `jsonable`, `find_nodes`, `NodeFunction`, and
+  `plan_schema`. Never copy engine logic into the GUI. The `flow-plan/2` shape
+  belongs to the engine: validate against its published JSON Schema
+  (`schema.py`), never re-declare the document model locally.
+- **Isolation.** Every evaluate/execute runs in a fresh subprocess. The web
+  process never imports user flow modules.
+- **Code wins.** Values a flow binds explicitly cannot be overridden. Mark such
+  parameters read-only in the UI; do not pretend an edit took effect.
+- **Per-node policy goes through the plan.** Edits live in
+  `state.plan.nodes[].policy` and reach the engine as `RunOptions.node_policies`,
+  keyed by node identity (name, path, instance) so each edit targets one
+  occurrence; name-wide overrides remain an engine capability, not the GUI
+  default. Never mutate `NodeFunction` attributes.
+- **Offline UI.** No CDN links, no network assets, no build step.
+- **Boring code.** Standard library first, minimal dependencies, no speculative
+  abstractions.
+
 ## Hard constraints
 
 - **Zero runtime dependencies.** Python >= 3.11 and the standard library only.
@@ -67,7 +94,8 @@ deterministic policy, and a JSON-lines run log, local or at HPC.
 
 ## Conventions
 
-- `docs/breakdown/` holds current state, in the seven layers.
+- `docs/breakdown/` holds current state, in the eight layers (review is the
+  eighth).
 - Dated history lives in `docs/archive/archive.zip`; read it record-by-record
   and never treat it as current state.
 - Candidate changes live in `docs/breakdown/06-evolution/selected/`; the
@@ -77,7 +105,10 @@ deterministic policy, and a JSON-lines run log, local or at HPC.
 
 ## Environment
 
-- Install for development with `pip install -e ".[dev]"`.
+- Install for development with `pip install -e ".[dev,gui]"`; the base install
+  (`pip install sequence-extensions-flow`) stays zero-dependency.
 - Run tests with `pytest` (the repo config sets `pythonpath`); coverage target
-  is 90 percent (`pytest --cov`).
-- Lint with `ruff check src tests` (line length 100, target py311).
+  is 90 percent for the engine (`pytest tests --ignore=tests/gui --cov`), and
+  the GUI suite is `pytest tests/gui`.
+- Lint with `ruff check src tests examples` (one root config, line length 100,
+  target py311).

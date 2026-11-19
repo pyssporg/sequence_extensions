@@ -29,8 +29,7 @@ Idea to IMP to decision to task, per the change pipeline:
 
 ## Open IMPs
 
-- `IMP-018` — pickle payload tier for run-log values.
-- `IMP-020` — split `ext` from `flow` at a future release.
+The open IMPs are the files in `suggested/` and `selected/`; each IMP's `status:` is the tracker. Implemented IMPs sit in `implemented/` and are no longer tracked.
 
 Direction pointers: `INFO-013`.
 

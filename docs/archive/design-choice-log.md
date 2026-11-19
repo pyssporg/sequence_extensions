@@ -1,4 +1,4 @@
-<!-- GENERATED FILE — do not edit. Regenerate with `pb registers`. -->
+<!-- GENERATED FILE — do not edit. Regenerate with pb-registers. -->
 
 # Decision Log
 
@@ -7,6 +7,9 @@ stream.
 
 | Date | ID | Decision | Layers | Status | Record |
 |---|---|---|---|---|---|
+| 2026-11-19 | AD-003 | Ship one distribution with a GUI extra | architecture, implementation | accepted | `AD-003` |
+| 2026-11-19 | AD-002 | Merge the GUI into the engine repository | architecture, implementation | accepted | `AD-002` |
+| 2026-11-13 | AD-001 | Keep the GUI repo separate and couple through the engine's plan schema | architecture, implementation | accepted | `AD-001` |
 | 2026-11-11 | DR-021 | Engine-core size budget with guardrail | intent | accepted | `DR-021` |
 | 2026-11-11 | DR-020 | Plan-before-execution via construct-only plan pass | intent, product | accepted | `DR-020` |
 | 2026-10-22 | DR-019 | Stress-hardening pass — fail-safe settlement, iterative retries, canonical logs | architecture, implementation, verification | accepted | `DR-019` |

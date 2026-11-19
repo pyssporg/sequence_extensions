@@ -4,7 +4,7 @@ type: imp
 title: Pickle payload tier for run-log values
 summary: jsonable falls back to str() for values JSON cannot express; an optional deferred pickle sidecar would preserve full structure
 date: 2026-10-14
-status: current
+status: selected
 ---
 
 # Pickle payload tier for run-log values

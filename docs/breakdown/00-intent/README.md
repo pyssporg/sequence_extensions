@@ -13,4 +13,5 @@ Boundary: holds the why only — not how it is built (Architecture, Implementati
 <!-- pb:index:start -->
 <!-- GENERATED FILE — do not edit. Regenerate with pb-registers. -->
 - **INFO-001** [00-intent — Vision & Goals](vision.md) — Vision, goal, requirements, and success criteria — parallel, deterministic, audited campaign execution, local or at HPC
+- [gui-application](gui-application/README.md)
 <!-- pb:index:end -->

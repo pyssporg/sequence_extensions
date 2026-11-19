@@ -36,7 +36,7 @@ import sys
 import traceback
 from pathlib import Path
 
-from sequence_extensions.flow import Run, execute_plan, jsonable
+from sequence_extensions.flow import PLAN_SCHEMA, Run, execute_plan, jsonable
 from sequence_extensions.flow_runner._discovery import find_nodes, list_nodes
 
 __all__ = ["find_nodes", "main"]
@@ -45,9 +45,6 @@ __all__ = ["find_nodes", "main"]
 EXIT_OK = 0
 EXIT_RUN_ERROR = 1
 EXIT_USAGE = 2
-
-#: The one plan schema this runner accepts.
-PLAN_SCHEMA = "flow-plan/2"
 
 
 # ---------------------------------------------------------------- #

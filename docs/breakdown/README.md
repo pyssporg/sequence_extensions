@@ -1,48 +1,40 @@
-# Product Breakdown — sequence_extensions
+# Product Breakdown — sequence_extensions and the GUI
 
-Current-state record for sequence_extensions: higher-order function extensions for Python sequences, dependency-graph futures, and the flow engine — parallel, deterministic, audited. For authors and agents.
+Current-state record for the one distribution in this repo, `sequence-extensions-flow`: the engine library — sequence helpers, graph futures, the flow engine — installed plainly, plus the GUI application that previews and runs flows locally, installed with the `gui` extra. Both import packages live under `src/`; the tests split between `tests/` and `tests/gui/`. For authors and agents.
 
-## The Seven Layers
+## The Eight Layers
 
-- `00-intent/` — why does the project exist, who is it for?
-- `01-product/` — what do users need?
-- `02-architecture/` — what is delivered, and how is it organized?
+- `00-intent/` — why does it exist, who is it for? (`gui-application/`: the GUI's intent)
+- `01-product/` — what is delivered, out of scope? (`use-cases/`: `CP-016`..`CP-030` engine, `CP-036`..`CP-044` GUI; `planning/`: `CP-031`..`CP-035`; `gui-application/`: `REQ-`)
+- `02-architecture/` — how are deliverables, evidence, and work organized?
 - `03-implementation/` — with what concrete assets is it realized?
 - `04-verification/` — how do we know it satisfies the requirements?
 - `05-operation/` — how do authors run, maintain, release?
-- `06-evolution/` — what controlled changes come next?
-- the decision stream (`docs/archive/archive.zip`) — flat, dated history: never current state; read record-by-record via `pb archive read`, never browsed
+- `06-evolution/` — what work is open: the suggested → selected → implemented IMP funnel, `investigations/`, `plans/`
+- `07-review/` — how are the definition and its implementation scrutinized?
+- the decision archive (`docs/archive/archive.zip`) — dated history, read via `pb archive`, never browsed
 
 ## Boundary Rule
 
 A document's home is the layer whose question it answers; information flows downward only.
-- Current state: the layer leaves, present tense.
-- History: the decision stream (`docs/archive/archive.zip`), dated records.
-- Tracking: the generated registers in `docs/archive/` (`README.md`, `design-choice-log.md`, `traceability-map.md`).
+- Current state: layer leaves, present tense. History: the archive, dated records. Tracking: the IMP's `status:`, never a leaf.
+- Review is the exception: it reads the whole stack and routes findings back; it owns no claim.
 - This file indexes current state only.
-
-## Reading Order
-
-1. This file, then the layer index that owns the concern.
-2. The index `## Contents` rows carry stable ID plus one-line summary; open the one leaf whose summary matches.
-3. Stop when the fact is found; never keep reading for context.
 
 ## Find a Fact
 
-- Current state: this file, then the owning layer index, then the one leaf.
-- History: the archive (`docs/archive/archive.zip`) record-by-record via `pb archive read`; never browse the stream.
-- Candidates: `06-evolution/` IMPs and roadmap.
-- Cite nodes by stable ID (INFO-002), never by path.
+- Current state: this file, then the owning layer index, then the one leaf whose summary matches; stop there.
+- History: the archive record-by-record via `pb archive read`; never browse the stream. Candidates: `06-evolution/suggested/` and `selected/`.
+- Cite nodes by stable ID, never by path.
 
 ## Route an Edit
 
 - Current-state fact: update the owning layer leaf.
-- Dated choice: a decision record via `pb archive add` into `docs/archive/archive.zip`.
-- Candidate change: an IMP in `06-evolution/selected/`.
+- Dated choice: a decision record via `pb archive add`.
+- Candidate change: an IMP in `06-evolution/suggested/`; once selected, `selected/` plus its plan.
 - One fact has exactly one home; defer cross-layer material by ID.
 - Never hand-edit generated registers or index `## Contents` lists.
 
 ## Excludes
 
-- Implementation detail and durable rationale: `docs/` (runtime-coupled), outside this tree.
-- `docs/API.md` and `docs/references/` — runtime-coupled docs and reference material, outside this breakdown.
+- Implementation detail, durable rationale, `docs/API.md`, and `docs/references/`: runtime-coupled, outside this tree.

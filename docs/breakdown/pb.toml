@@ -1,6 +1,9 @@
 # pb.toml — overrides only; everything else matches the built-in defaults
 # (skill templates/pb.toml; pbstd/config.py is authoritative on disagreement).
 
+[meta]
+version = "1.0"
+
 [layout]
 # Cold-storage decision archive (ZIP): records at the zip root, tombstones
 # under its deprecated/ namespace, reached only via `pb archive`.

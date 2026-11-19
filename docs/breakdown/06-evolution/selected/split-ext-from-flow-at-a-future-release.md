@@ -4,7 +4,7 @@ type: imp
 title: Split ext from flow at a future release
 summary: One distribution ships two unrelated products; kept together for 1.0.0, revisit when either half grows a dependency
 date: 2026-10-14
-status: current
+status: selected
 ---
 
 # Split ext from flow at a future release

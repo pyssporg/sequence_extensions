@@ -4,16 +4,6 @@ from sequence_extensions import list_ext
 from sequence_extensions.ext.dict_ext import dict_ext
 
 
-@pytest.fixture
-def int_dict():
-    return dict_ext({"a": 1, "b": 2, "c": 3, "d": 4})
-
-
-@pytest.fixture
-def empty_dict():
-    return dict_ext()
-
-
 def test_init_empty_then_setitem():
     d1 = dict_ext({"a": 1, "b": 2})
     assert d1["a"] == 1

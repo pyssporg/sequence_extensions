@@ -38,8 +38,10 @@ jobs:
       - name: Smoke test the wheel
         run: |
           python -m venv /tmp/smoke
-          /tmp/smoke/bin/pip install dist/*.whl
+          /tmp/smoke/bin/pip install "dist/*.whl[gui]"
           /tmp/smoke/bin/flow-runner --help
+          /tmp/smoke/bin/seq-ext-gui --help
+          /tmp/smoke/bin/python -c "from importlib.resources import files; assert (files('seq_ext_gui') / 'static' / 'index.html').is_file(); assert (files('sequence_extensions') / 'schemas' / 'flow-plan-2.schema.json').is_file()"
 
       - name: Stage the plan schema
         run: cp src/sequence_extensions/schemas/flow-plan-2.schema.json dist/

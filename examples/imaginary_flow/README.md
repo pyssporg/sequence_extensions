@@ -1,0 +1,32 @@
+# Imaginary prepare → simulate → post-process flow
+
+A tiny three-stage flow used as a GUI example:
+
+| Node | What it does |
+| --- | --- |
+| `prepare_data` | Read `data/raw_measurements.csv`, drop bad rows, write `_out/prepared.json`. |
+| `simulate` | Apply a first-order lag model; `gain` and `damping` are editable node parameters. |
+| `postprocess` | Compare prediction to measurement, write `_out/report.json`, return the verdict. |
+
+`pipeline` submits the three nodes in order, so the graph in the GUI is the
+chain `prepare_data → simulate → postprocess`.
+
+## Run it in the GUI
+
+```bash
+seq-ext-gui --project-root examples/imaginary_flow
+```
+
+Pick `flows.py`, press **Evaluate**, select `pipeline`, then edit `gain`,
+`damping`, or `threshold` on the nodes and press **Execute**. `_out/` is
+gitignored scratch output.
+
+## Run it from the CLI
+
+```bash
+cd examples/imaginary_flow
+flow-runner plan.json --module flows --flow pipeline
+```
+
+Import `plan.json` in the GUI when you want the committed defaults as a
+starting point.

@@ -1,0 +1,137 @@
+{
+  "schema": "flow-plan/2",
+  "parameters": [
+    {
+      "name": "raw_path",
+      "type": "Path",
+      "required": false,
+      "default": "data/raw_measurements.csv",
+      "value": {
+        "path": "data/raw_measurements.csv",
+        "sha256": "db49b63bd8481b1133f46650223337846f21859869668504879113885aafafa6"
+      }
+    },
+    {
+      "name": "out_dir",
+      "type": "Path",
+      "required": false,
+      "default": "_out",
+      "value": {
+        "path": "_out",
+        "sha256": null
+      }
+    }
+  ],
+  "nodes": [
+    {
+      "id": 0,
+      "name": "prepare_data",
+      "kind": "node",
+      "path": [
+        "pipeline",
+        "prepare_data"
+      ],
+      "instance": 1,
+      "policy": {
+        "retries": 0,
+        "retry_delay_seconds": 0.0,
+        "timeout": null
+      },
+      "params": [
+        {
+          "name": "raw_path",
+          "type": "Path",
+          "required": true,
+          "default": null,
+          "value": {
+            "path": "data/raw_measurements.csv",
+            "sha256": "db49b63bd8481b1133f46650223337846f21859869668504879113885aafafa6"
+          }
+        },
+        {
+          "name": "out_dir",
+          "type": "Path",
+          "required": true,
+          "default": null,
+          "value": {
+            "path": "_out",
+            "sha256": null
+          }
+        }
+      ]
+    },
+    {
+      "id": 1,
+      "name": "simulate",
+      "kind": "node",
+      "path": [
+        "pipeline",
+        "simulate"
+      ],
+      "instance": 1,
+      "policy": {
+        "retries": 0,
+        "retry_delay_seconds": 0.0,
+        "timeout": null
+      },
+      "params": [
+        {
+          "name": "gain",
+          "type": "float",
+          "required": false,
+          "default": 0.8,
+          "value": 0.8
+        },
+        {
+          "name": "damping",
+          "type": "float",
+          "required": false,
+          "default": 0.8,
+          "value": 0.8
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "name": "postprocess",
+      "kind": "node",
+      "path": [
+        "pipeline",
+        "postprocess"
+      ],
+      "instance": 1,
+      "policy": {
+        "retries": 0,
+        "retry_delay_seconds": 0.0,
+        "timeout": null
+      },
+      "params": [
+        {
+          "name": "threshold",
+          "type": "float",
+          "required": false,
+          "default": 0.1,
+          "value": 0.1
+        }
+      ]
+    }
+  ],
+  "edges": [
+    {
+      "from": 1,
+      "to": 0
+    },
+    {
+      "from": 2,
+      "to": 1
+    }
+  ],
+  "options": {
+    "max_workers": 16,
+    "summary": false,
+    "fixed_clock": false,
+    "retries": 0,
+    "retry_delay_seconds": 0.0,
+    "timeout": null
+  }
+}

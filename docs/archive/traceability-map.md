@@ -1,4 +1,4 @@
-<!-- GENERATED FILE — do not edit. Regenerate with `pb registers`. -->
+<!-- GENERATED FILE — do not edit. Regenerate with pb-registers. -->
 
 # Traceability Map
 
@@ -26,6 +26,9 @@ the leaf is the source of truth; the record is how the state got there.
 
 ### Architecture
 
+- **AD-001** — State: `02-architecture/gui-application/how-the-gui-stays-decoupled-from-the-engine.md` (How the GUI stays decoupled from the engine) · Artifacts: `pyproject.toml`, `.github/workflows/tests.yml`, `gui/src/seq_ext_gui/schema.py`, `gui/src/seq_ext_gui/contracts.py`, `gui/src/seq_ext_gui/engine.py`, `gui/tests/test_schema.py`
+- **AD-002** — State: `02-architecture/gui-application/how-the-gui-stays-decoupled-from-the-engine.md` (How the GUI stays decoupled from the engine) · Artifacts: `pyproject.toml`, `gui/pyproject.toml`
+- **AD-003** — State: `02-architecture/gui-application/how-the-gui-stays-decoupled-from-the-engine.md` (How the GUI stays decoupled from the engine) · Artifacts: `pyproject.toml`, `src/sequence_extensions`, `src/seq_ext_gui`
 - **DR-001** — State: `02-architecture/workflow-engine.md` (02-architecture/workflow-engine.md) · Artifacts: `src/sequence_extensions/workflow/adaptation.py`, `src/sequence_extensions/workflow/schema.py`, `src/sequence_extensions/workflow/library.py`
 - **DR-002** — State: `02-architecture/workflow-engine.md` (02-architecture/workflow-engine.md) · Artifacts: `src/sequence_extensions/workflow/engine.py`, `src/sequence_extensions/workflow/adaptation.py`
 - **DR-004** — State: `02-architecture/workflow-artifacts-by-reference-data-plane.md` (02-architecture/workflow-artifacts-by-reference-data-plane.md) · Artifacts: `src/sequence_extensions/workflow/artifacts.py`, `src/sequence_extensions/workflow/engine.py`, `src/sequence_extensions/workflow/registry.py`, `src/sequence_extensions/workflow/history.py`
@@ -39,5 +42,5 @@ the leaf is the source of truth; the record is how the state got there.
 
 ### Operation
 
-- **DR-003** — State: `README.md` (Product Breakdown — sequence_extensions) · Artifacts: `docs/breakdown/pb.toml`, `docs/archive/archive.zip`, `docs/references/paper_44_yBqbPyj1.pdf`, `docs/breakdown/06-evolution/implemented/dynamic-adaptation.md`
-- **DR-006** — State: `README.md` (Product Breakdown — sequence_extensions) · Artifacts: `docs/archive/archive.zip`, `docs/breakdown/06-evolution/README.md`, `docs/breakdown/06-evolution/roadmap.md`, `docs/breakdown/05-operation/running-flows-local-and-at-hpc.md`
+- **DR-003** — State: `README.md` (Product Breakdown — sequence_extensions and the GUI) · Artifacts: `docs/breakdown/pb.toml`, `docs/archive/archive.zip`, `docs/references/paper_44_yBqbPyj1.pdf`, `docs/breakdown/06-evolution/implemented/dynamic-adaptation.md`
+- **DR-006** — State: `README.md` (Product Breakdown — sequence_extensions and the GUI) · Artifacts: `docs/archive/archive.zip`, `docs/breakdown/06-evolution/README.md`, `docs/breakdown/06-evolution/roadmap.md`, `docs/breakdown/05-operation/running-flows-local-and-at-hpc.md`

@@ -23,4 +23,5 @@ Where it is and what is in it: the concrete files, scripts, interfaces, and conf
 <!-- pb:index:start -->
 <!-- GENERATED FILE — do not edit. Regenerate with pb-registers. -->
 - **INFO-005** [Implementation asset map](assets.md) — File-by-file map of the sequence_extensions package, its key config, and its entry points
+- [gui-application](gui-application/README.md)
 <!-- pb:index:end -->

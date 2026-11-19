@@ -47,6 +47,9 @@ from ._execution.node import NodeFunction, node
 from ._execution.process_pool import ProcessDispatchError, ProcessGraphPool
 from ._execution.run import Run, execute_flow
 from ._planning.document import (
+    PLAN_SCHEMA as PLAN_SCHEMA,
+)
+from ._planning.document import (
     apply_override,
     diff_plans,
     execute_plan,

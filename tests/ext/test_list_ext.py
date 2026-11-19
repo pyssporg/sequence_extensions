@@ -3,16 +3,6 @@ import pytest
 from sequence_extensions import list_ext
 
 
-@pytest.fixture
-def simple_int_list():
-    return list_ext([1, 2, 3, 4])
-
-
-@pytest.fixture
-def empty_list():
-    return list_ext([])
-
-
 def test_init_empty_then_append():
     l1 = list_ext([1, 2, 3, 4])
     assert l1[0] == 1
