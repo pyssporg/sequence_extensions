@@ -1168,6 +1168,24 @@ python -m sequence_extensions.flow_runner plan.json --module mypackage.flows
 
 The runner loads the JSON document and checks `schema == "flow-plan/2"` (invalid JSON, a non-object, or the wrong schema exits 2), imports the module, scans it for the `__node__` marker, and calls `execute_plan`, which builds the root kwargs, node registry, per-node policies, and `RunOptions` from the document. Status, duration, log path, and result go to stdout. Flow selection is never read from the plan, and process pools are constructed in code (the runner drives thread-mode runs). Exit codes: `0` ok, `1` the run raised, `2` usage/config error.
 
+### Headless run API
+
+`sequence_extensions.flow_runner.headless` is the one importable run unit the CLI and the GUI worker are thin adapters over; the `flow-plan/2` document shape itself is owned by [flow-plan/2](breakdown/02-architecture/flow-plan-2-is-the-wire-contract.md).
+
+- `load_flow_module(source)` — import a dotted module, a `.py` file (by path, under a synthetic module name), or a package directory (dotted import with its parent on `sys.path`). Raises `ValueError` for a non-`.py` file, `FileNotFoundError` for a missing path, and `ImportError` on a load failure.
+- `select_flow(module, name=None)` — the module's only node, or the exact `name`; raises `ValueError` with the available names otherwise.
+- `require_plan_document(document)` — return `document` unchanged when its `schema` is `flow-plan/2`; raises `ValueError` otherwise.
+- `run_flow(source, *, flow_name=None, document=None, seed=None, overrides=(), options=None, log=None, cwd=None, plan_only=False)` — load, select, plan (`plan_document` with `seed`) or merge `overrides` (`apply_override`), gate the schema, then run (`execute_plan`). `cwd` is process-global and restored on exit. Returns a `HeadlessRun`.
+- `HeadlessRun` — frozen dataclass with `flow_name`, `document`, and `run` (`None` for plan-only); `to_dict()` returns `{"flow_name", "plan", "run"}` with the run's `result` encoded by `jsonable`.
+
+```python
+from sequence_extensions.flow_runner.headless import run_flow
+
+headless = run_flow("examples/flow_runner/flows.py", flow_name="campaign", plan_only=True)
+print(headless.flow_name)          # campaign
+print(headless.document["schema"])  # flow-plan/2
+```
+
 ### The run log — the executed truth
 
 One JSON-lines file per run (schema 2). Record kinds:

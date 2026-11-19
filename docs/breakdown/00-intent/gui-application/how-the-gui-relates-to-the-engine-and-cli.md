@@ -11,7 +11,7 @@ status: current
 
 The GUI shares the engine API with the CLI; the CLI stays the batch path, GUI adds preview and plan editing.
 
-- **Same API:** the GUI calls `plan_document`, `apply_override`, `execute_plan`, `RunOptions`, `NodePolicy`, `jsonable`, and `find_nodes`; it copies no engine logic (`INFO-031`).
+- **Same API:** the GUI and the CLI both call the engine's headless run API (`run_flow`); the GUI adds `apply_override` and its own wire policy, and copies no engine logic (`INFO-047`).
 - **Shared inputs:** both paths read one flow module and one `flow-plan/2` JSON plan.
 - **CLI role:** `flow-runner PLAN.json --module MODULE [--flow NAME]` runs a prepared plan as the batch path, with no preview or edit step.
 - **GUI adds:** graph preview, plan import/export, per-run plan edits, and a run log that streams while the run runs (`REQ-004`).

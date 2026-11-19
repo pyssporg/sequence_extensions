@@ -39,7 +39,8 @@ The package `sequence-extensions` (v3.1.0) is a pure Python library plus one con
 - `flow/_recording/records.py` — run-log record construction (node/run/skip, error field, jsonable arguments), UTC clock, safe node names, run-id shape
 - `flow/_recording/serialize.py` — `jsonable`, strict JSON bytes, deterministic sets/nested keys, fixed clock constants
 - `flow/_recording/diff.py` — diff identity, occurrence multiset, record comparison
-- `flow_runner/__init__.py` — the `flow-runner` CLI: plan JSON loading and schema check, module import, flow selection, `execute_plan` call, exit codes
+- `flow_runner/headless.py` — public headless run API: `HeadlessRun`, `load_flow_module`, `select_flow`, `require_plan_document`, `run_flow`
+- `flow_runner/__init__.py` — the `flow-runner` CLI over `headless.run_flow`: plan JSON loading, `--flow`/`--log` flags, exit codes
 - `flow_runner/_discovery.py` — node discovery via `find_nodes` (listing is internal)
 - `flow_runner/__main__.py` — `python -m sequence_extensions.flow_runner` entry
 

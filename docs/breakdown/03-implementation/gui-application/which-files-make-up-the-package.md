@@ -11,7 +11,7 @@ status: current
 
 The GUI is one import package at `src/seq_ext_gui`, with its tests at `tests/gui`, its examples, and its docs beside the engine.
 
-- **Core:** `contracts` holds the wire models and plan-dict helpers, `schema` validates plans against the engine schema, `engine` adapts the flow engine, `worker` is the subprocess entry point.
+- **Core:** `contracts` holds the wire models and plan-dict helpers, `schema` validates plans against the engine schema, `engine` calls the engine's headless run API and keeps the GUI's planning policy, `worker` is the subprocess entry point.
 - **Server:** `app` defines the endpoints, `jobs` supervises workers, `files` confines browsing, `cli` starts uvicorn.
 - **Static:** `index.html`, `app.js`, `graph.js`, `styles.css`; no build output.
 - **Tests:** `tests/gui` holds one module per concern — API, engine, files, jobs, schema, static, worker — plus `conftest.py` fixtures.

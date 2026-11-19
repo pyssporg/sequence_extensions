@@ -7,6 +7,7 @@ stream.
 
 | Date | ID | Decision | Layers | Status | Record |
 |---|---|---|---|---|---|
+| 2026-11-19 | AD-004 | One headless run API in flow_runner behind both frontends | architecture, implementation | accepted | `AD-004` |
 | 2026-11-19 | AD-003 | Ship one distribution with a GUI extra | architecture, implementation | accepted | `AD-003` |
 | 2026-11-19 | AD-002 | Merge the GUI into the engine repository | architecture, implementation | accepted | `AD-002` |
 | 2026-11-13 | AD-001 | Keep the GUI repo separate and couple through the engine's plan schema | architecture, implementation | accepted | `AD-001` |

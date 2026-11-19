@@ -9,7 +9,7 @@ status: current
 
 # Components
 
-The package decomposes into three subpackages plus one standalone CLI with a strict dependency order: `flow` depends on `graph`; `flow_runner` depends on `flow`; `graph` and `ext` are config-free (stdlib only, no package imports).
+The package decomposes into three engine subpackages, `ext`, `graph`, and `flow`, plus the `flow_runner` adapter package, with a strict dependency order: `flow` depends on `graph`; `flow_runner` depends on `flow`; `graph` and `ext` are config-free (stdlib only, no package imports).
 
 ## `ext` — sequence helpers
 
@@ -46,10 +46,11 @@ The package decomposes into three subpackages plus one standalone CLI with a str
 - **`_planning/document`** — the `flow-plan/2` document interface: `plan_document`, `plan_manifest`, `apply_override`, `execute_plan`, `diff_plans` (`CP-026`, `CP-032`–`CP-035`).
 - **`_planning/schema`** — `plan_schema()`: the schema built from plain data, so the engine keeps zero runtime dependencies; the checked-in artifact is generated from it.
 
-## `flow_runner` — the CLI
+## `flow_runner` — the headless run API and CLI
 
+- `headless` — the public headless run API: `HeadlessRun`, `load_flow_module`, `select_flow`, `require_plan_document`, and `run_flow`; one unit loads, selects, gates, plans/overrides, executes, and projects.
 - `_discovery` — node discovery via the `__node__` marker and `find_nodes` (list is internal).
-- `__init__` — the `flow-runner` console script and `python -m` entry: plan JSON loading and schema check, module import, `--flow` selection, `--log` override, `execute_plan` call, and exit-code mapping (`CP-026`).
+- `__init__` — the `flow-runner` console script and `python -m` entry: plan JSON loading, `--flow`/`--log` flags, and exit-code mapping over `run_flow` (`CP-026`).
 - `--module` names the workflow module; the plan document carries root values, node params/policy, edges, and run `options`; the root node is external state, never in the document.
 - Exit codes: 0 ok, 1 run failure, 2 usage or config error.
 

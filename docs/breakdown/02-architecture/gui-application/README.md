@@ -28,5 +28,5 @@ How the GUI is organized to meet its requirements — process split, message flo
 - **INFO-033** [What crosses the wire between API and worker](what-crosses-the-wire-between-api-and-worker.md) — One contracts module for the process models; the plan crosses as a plain JSON document
 - **INFO-034** [How project paths are confined](how-project-paths-are-confined.md) — Every file path resolves inside the project root
 - **INFO-035** [How the graph is laid out offline](how-the-graph-is-laid-out-offline.md) — Layered SVG computed in the browser, no CDN
-- **INFO-047** [How the GUI stays decoupled from the engine](how-the-gui-stays-decoupled-from-the-engine.md) — One repo, one distribution with a GUI extra, one-way dependency on nine symbols plus the plan schema
+- **INFO-047** [How the GUI stays decoupled from the engine](how-the-gui-stays-decoupled-from-the-engine.md) — One repo, one distribution with a GUI extra, one-way dependency on the public headless run API plus the plan schema
 <!-- pb:index:end -->

@@ -35,8 +35,8 @@ deterministic policy, and a JSON-lines run log, local or at HPC.
 - `src/sequence_extensions/graph/` holds `GraphFuture` and `GraphPool`, the
   dependency-graph substrate.
 - `src/sequence_extensions/flow/` holds `@node`, `execute_flow`, the run log,
-  and the process pool; `src/sequence_extensions/flow_runner/` holds the
-  `flow-runner` CLI.
+  and the process pool; `src/sequence_extensions/flow_runner/` holds the public
+  headless run API (`headless.py`) and the `flow-runner` CLI over it.
 - The run log is the executed truth of a run; re-running is a fresh run.
 
 ### GUI
@@ -48,9 +48,11 @@ deterministic policy, and a JSON-lines run log, local or at HPC.
   `tests/gui/` and its sample project in `examples/imaginary_flow/`.
 - The dependency is one-way: the GUI imports the engine, the engine never
   imports `seq_ext_gui`. Engine changes are their own work, not a GUI feature.
-- **Engine API only.** Call `plan_document`, `apply_override`, `execute_plan`,
-  `RunOptions`, `NodePolicy`, `jsonable`, `find_nodes`, `NodeFunction`, and
-  `plan_schema`. Never copy engine logic into the GUI. The `flow-plan/2` shape
+- **Engine API only.** Call the headless run API — `run_flow`,
+  `load_flow_module`, `select_flow`, `require_plan_document`, `HeadlessRun` —
+  plus `plan_document`, `apply_override`, `execute_plan`, `RunOptions`,
+  `NodePolicy`, `jsonable`, `find_nodes`, `NodeFunction`, and `plan_schema`.
+  Never copy engine logic into the GUI. The `flow-plan/2` shape
   belongs to the engine: validate against its published JSON Schema
   (`schema.py`), never re-declare the document model locally.
 - **Isolation.** Every evaluate/execute runs in a fresh subprocess. The web

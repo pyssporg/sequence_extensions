@@ -12,7 +12,7 @@ status: current
 The worker runs once as `python -m seq_ext_gui.worker <request.json> <result.json>`.
 
 - **Input:** one `WorkerRequest` file; `mode` selects `plan` or `execute`.
-- **Directory:** the worker changes to the flow file's parent before loading the flow; there is no separate `cwd` field.
+- **Directory:** the worker passes the flow file's parent as `cwd` to the headless run; the request has no separate `cwd` field.
 - **Result:** it always writes the result file, including a handled flow error with `ok=false`.
 - **Exit:** 0 for a handled result, non-zero for a worker crash.
 - **Output:** stdout and stderr stay silent except a short traceback on crash.

@@ -9,6 +9,21 @@ from pathlib import Path
 from seq_ext_gui.contracts import WorkerRequest, to_document
 from seq_ext_gui.engine import _override_from_seed, discover, execute, plan
 
+RELATIVE_FLOW = '''\
+"""Flow that reads a sibling file through a relative path at run time."""
+
+from __future__ import annotations
+
+from pathlib import Path
+
+from sequence_extensions.flow import node
+
+
+@node
+def relative() -> str:
+    return Path("data.txt").read_text(encoding="utf-8").strip()
+'''
+
 
 def _request(sample_project, **kwargs) -> WorkerRequest:
     values = {"mode": "plan", "flow_file": str(sample_project.flow), "flow_name": "root"}
@@ -275,6 +290,31 @@ def test_plan_round_trips_a_path_parameter(sample_project) -> None:
     assert result.ok, result.error
     assert result.run is not None
     assert result.run.result == "cases"
+
+
+def test_flow_file_cwd_resolves_relative_paths(tmp_path: Path) -> None:
+    nested = tmp_path / "nested"
+    nested.mkdir()
+    (nested / "data.txt").write_text("hello\n", encoding="utf-8")
+    flow = nested / "relative.py"
+    flow.write_text(RELATIVE_FLOW, encoding="utf-8")
+
+    planned = plan(WorkerRequest(mode="plan", flow_file=str(flow), flow_name="relative"))
+    assert planned.ok, planned.error
+    assert planned.plan is not None
+
+    result = execute(
+        WorkerRequest(
+            mode="execute",
+            flow_file=str(flow),
+            flow_name="relative",
+            plan=to_document(planned.plan),
+        )
+    )
+
+    assert result.ok, result.error
+    assert result.run is not None
+    assert result.run.result == "hello"
 
 
 def test_execute_requires_a_plan(sample_project) -> None:

@@ -23,23 +23,40 @@ convenience, not a requirement.  A plan file names a module to import, so
 treat it as trusted code.  Process pools are constructed in code; the runner
 drives thread-mode runs.
 
-Implementation modules: :mod:`._discovery` (the node scan) and this module
-(the argument parser, plan loading, imports, and exit-code mapping).
+This module is the command-line adapter over :mod:`.headless`: it owns only
+argument parsing, plan-file reading, output wording, and exit-code mapping.
+:mod:`._discovery` holds the node scan.
 """
 
 from __future__ import annotations
 
 import argparse
-import importlib
+import inspect
 import json
 import sys
 import traceback
 from pathlib import Path
 
-from sequence_extensions.flow import PLAN_SCHEMA, Run, execute_plan, jsonable
-from sequence_extensions.flow_runner._discovery import find_nodes, list_nodes
+from sequence_extensions.flow import jsonable
 
-__all__ = ["find_nodes", "main"]
+from ._discovery import find_nodes
+from .headless import (
+    HeadlessRun,
+    load_flow_module,
+    require_plan_document,
+    run_flow,
+    select_flow,
+)
+
+__all__ = [
+    "HeadlessRun",
+    "find_nodes",
+    "load_flow_module",
+    "main",
+    "require_plan_document",
+    "run_flow",
+    "select_flow",
+]
 
 #: Exit codes: 0 ok, 1 run failure, 2 usage/config error.
 EXIT_OK = 0
@@ -74,10 +91,10 @@ def _read_plan(source: Path) -> dict:
 
     if not isinstance(document, dict):
         raise ValueError(f"{where}: plan must be a JSON object, got {type(document).__name__}")
-    schema = document.get("schema")
-    if schema != PLAN_SCHEMA:
-        raise ValueError(f"{where}: expected schema {PLAN_SCHEMA!r}, got {schema!r}")
-    return document
+    try:
+        return require_plan_document(document)
+    except ValueError as e:
+        raise ValueError(f"{where}: {e}") from None
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -116,16 +133,13 @@ def main(argv: list[str] | None = None) -> int:
     )
     args = parser.parse_args(argv)
 
-    try:
-        module = importlib.import_module(args.module)
-    except ImportError as e:
-        return _fail(f"cannot import module {args.module!r}: {e}")
-    except Exception as e:
-        return _fail(f"module {args.module!r} raised while importing: {type(e).__name__}: {e}")
-
     if args.list:
+        try:
+            module = load_flow_module(args.module)
+            entries = [(name, _first_doc_line(fn)) for name, fn in find_nodes(module).items()]
+        except (ImportError, OSError, ValueError) as e:
+            return _fail(str(e))
         print(f"flows in {args.module}:")
-        entries = list_nodes(module)
         for node_name, summary in entries:
             print(f"  {node_name}" + (f"  — {summary}" if summary else ""))
         if not entries:
@@ -141,47 +155,37 @@ def main(argv: list[str] | None = None) -> int:
         return _fail(str(e))
 
     try:
-        nodes = find_nodes(module)
-    except ValueError as e:
-        return _fail(str(e))
-
-    if args.flow is not None:
-        flow_name = args.flow
-        fn = nodes.get(flow_name)
-        if fn is None:
-            available = ", ".join(sorted(nodes)) or "(none found)"
-            return _fail(f"no flow {flow_name!r} in module {args.module!r}; available: {available}")
-    elif len(nodes) == 1:
-        flow_name, fn = next(iter(nodes.items()))
-    else:
-        available = ", ".join(sorted(nodes)) or "(none found)"
-        return _fail(f"no flow selected — pass --flow (available: {available})")
-
-    try:
-        run = execute_plan(fn, document, log=args.log)
+        headless = run_flow(args.module, flow_name=args.flow, document=document, log=args.log)
     except ValueError as exc:
         # A document/config violation raises before anything runs; an
         # executed failure carries the run account (``.run``).
         if getattr(exc, "run", None) is None:
             return _fail(str(exc))
         traceback.print_exc()
-        _report_run(exc.run, flow_name)
+        _report_run(exc.run, getattr(exc, "flow_name", args.flow or "?"))
         return EXIT_RUN_ERROR
+    except (ImportError, OSError) as exc:
+        return _fail(str(exc))
     except Exception as exc:
         traceback.print_exc()
-        _report_run(getattr(exc, "run", None), flow_name)
+        _report_run(getattr(exc, "run", None), getattr(exc, "flow_name", args.flow or "?"))
         return EXIT_RUN_ERROR
 
-    _report_run(run, flow_name)
+    _report_run(headless.run, headless.flow_name)
     try:
-        shown = json.dumps(jsonable(run.result), default=str)
+        shown = json.dumps(jsonable(headless.run.result), default=str)
     except Exception:  # pragma: no cover - jsonable's own fallbacks cover exotic types
-        shown = repr(run.result)
+        shown = repr(headless.run.result)
     print(f"result: {shown}")
     return EXIT_OK
 
 
-def _report_run(run: Run | None, flow_name: str) -> None:
+def _first_doc_line(fn) -> str:
+    doc = (inspect.getdoc(fn) or "").strip()
+    return doc.splitlines()[0] if doc else ""
+
+
+def _report_run(run, flow_name: str) -> None:
     """Print the run's account line: status, duration, log path."""
     if run is None:
         print(f"flow {flow_name}: error")

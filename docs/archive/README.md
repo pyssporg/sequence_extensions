@@ -47,6 +47,8 @@ Records live in the cold-storage archive; extract one with `pb archive read <ID>
   One repo ships two distributions; the GUI under gui/ depends one-way on the zero-dependency engine at the repo root.
 - **AD-003** — Ship one distribution with a GUI extra · accepted · 2026-11-19 · `AD-003`
   One distribution, sequence-extensions-flow, puts the GUI behind the gui extra; the base install stays zero-dependency.
+- **AD-004** — One headless run API in flow_runner behind both frontends · accepted · 2026-11-19 · `AD-004`
+  One headless run API lives in flow_runner, not flow, so both frontends stay thin adapters and the engine-core budget holds.
 - **DR-001** — Scoped DAG handle for dynamic adaptation · superseded · 2026-10-09 · `DR-001`
   Dynamic adaptation uses a scoped DAG handle with a <scope> element; the declarative <branch>/<case> + Repeat() option is rejected.
 - **DR-002** — Lazy tree-walking engine for dynamic adaptation · superseded · 2026-10-09 · `DR-002`

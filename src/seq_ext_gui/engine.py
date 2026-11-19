@@ -8,30 +8,27 @@ talks to it through :mod:`seq_ext_gui.worker`.
 from __future__ import annotations
 
 import contextlib
-import hashlib
-import importlib
-import importlib.util
 import inspect
 import json
 import math
-import os
-import sys
 import time
 import traceback
-from collections.abc import Iterator
 from pathlib import Path
-from types import ModuleType
 from typing import Any
 
 from sequence_extensions.flow import (
     NodeFunction,
     RunOptions,
     apply_override,
-    execute_plan,
-    jsonable,
-    plan_document,
 )
 from sequence_extensions.flow_runner import find_nodes
+from sequence_extensions.flow_runner.headless import (
+    HeadlessRun,
+    load_flow_module,
+    require_plan_document,
+    run_flow,
+    select_flow,
+)
 
 from .contracts import (
     PLAN_SCHEMA,
@@ -60,25 +57,37 @@ def plan(request: WorkerRequest) -> WorkerResult:
     """Build the wire plan for ``request`` without executing user node bodies."""
     started = time.monotonic()
     try:
-        with _working_directory(request) as flow_file:
-            selected, fn, available = _load_flow(request, flow_file)
-            seed = request.plan
-            if seed is not None:
-                _require_document(seed)
-                if is_complete_document(seed):
-                    validate_plan(seed)
-            root_kwargs = _root_values(fn, seed)
-            fresh = plan_document(fn, options=_run_options(seed), **root_kwargs)
-            document = fresh
-            warnings: list[str] = []
-            if seed is not None:
-                override, seed_warnings = _override_from_seed(seed, fresh, root_kwargs)
-                warnings.extend(seed_warnings)
-                if override:
-                    document = apply_override(fresh, override)
-            validate_plan(document)
-            wire_plan, wire_warnings = _wire_plan(fresh, values=document)
-            warnings.extend(wire_warnings)
+        seed = request.plan
+        if seed is not None:
+            require_plan_document(seed)
+            if is_complete_document(seed):
+                validate_plan(seed)
+        flow_file = Path(request.flow_file).expanduser().resolve()
+        module = load_flow_module(flow_file)
+        selected, fn = select_flow(module, request.flow_name)
+        available = sorted(find_nodes(module))
+        root_kwargs = _root_values(fn, seed)
+        fresh = run_flow(
+            module,
+            flow_name=selected,
+            seed=root_kwargs,
+            cwd=flow_file.parent,
+            plan_only=True,
+        ).document
+        document = fresh
+        warnings: list[str] = []
+        if seed is not None:
+            override, seed_warnings = _override_from_seed(seed, fresh, root_kwargs)
+            warnings.extend(seed_warnings)
+            raw_options = seed.get("options")
+            if raw_options:
+                _run_options(seed)  # validate through the engine's RunOptions
+                override["options"] = dict(raw_options)
+            if override:
+                document = apply_override(fresh, override)
+        validate_plan(document)
+        wire_plan, wire_warnings = _wire_plan(fresh, values=document)
+        warnings.extend(wire_warnings)
         return WorkerResult(
             ok=True,
             mode="plan",
@@ -96,10 +105,9 @@ def discover(request: WorkerRequest) -> WorkerResult:
     """List every ``@node`` in the flow module without running node bodies."""
     started = time.monotonic()
     try:
-        with _working_directory(request) as flow_file:
-            if flow_file.suffix != ".py":
-                raise EngineError(f"flow file must be a .py file: {request.flow_file!r}")
-            module = _import_flow_module(flow_file)
+        flow_file = Path(request.flow_file).expanduser().resolve()
+        with contextlib.chdir(flow_file.parent):
+            module = load_flow_module(flow_file)
             cards = [_node_card(name, node) for name, node in find_nodes(module).items()]
         return WorkerResult(
             ok=True,
@@ -118,35 +126,45 @@ def execute(request: WorkerRequest) -> WorkerResult:
         if request.plan is None:
             raise EngineError("execute requires a plan")
         document = to_document(request.plan)
-        _require_document(document)
+        require_plan_document(document)
         validate_plan(document)
-        with _working_directory(request) as flow_file:
-            selected, fn, available = _load_flow(request, flow_file)
-            try:
-                run = execute_plan(fn, document, log=request.log_dir)
-            except Exception as exc:
-                wire_plan, warnings = _wire_plan(document)
-                return WorkerResult(
-                    ok=False,
-                    mode="execute",
-                    flow_name=selected,
-                    available_flows=available,
-                    plan=wire_plan,
-                    run=_run_result(getattr(exc, "run", None), exc),
-                    warnings=warnings,
-                    error=str(exc),
-                    error_type=type(exc).__name__,
-                    traceback=traceback.format_exc(),
-                    duration_ms=_elapsed_ms(started),
-                )
+        flow_file = Path(request.flow_file).expanduser().resolve()
+        try:
+            outcome = run_flow(
+                flow_file,
+                flow_name=request.flow_name,
+                document=document,
+                log=request.log_dir,
+                cwd=flow_file.parent,
+            )
+        except Exception as exc:
             wire_plan, warnings = _wire_plan(document)
+            run = getattr(exc, "run", None)
+            projected = HeadlessRun("", document, run).to_dict()["run"] if run is not None else None
+            run_result = (
+                RunResult(**projected)
+                if projected is not None
+                else RunResult(status="error", error=str(exc), error_type=type(exc).__name__)
+            )
+            return WorkerResult(
+                ok=False,
+                mode="execute",
+                flow_name=getattr(exc, "flow_name", None) or request.flow_name,
+                plan=wire_plan,
+                run=run_result,
+                warnings=warnings,
+                error=str(exc),
+                error_type=type(exc).__name__,
+                traceback=traceback.format_exc(),
+                duration_ms=_elapsed_ms(started),
+            )
+        wire_plan, warnings = _wire_plan(document)
         return WorkerResult(
             ok=True,
             mode="execute",
-            flow_name=selected,
-            available_flows=available,
+            flow_name=outcome.flow_name,
             plan=wire_plan,
-            run=_run_result(run),
+            run=RunResult(**outcome.to_dict()["run"]),
             warnings=warnings,
             duration_ms=_elapsed_ms(started),
         )
@@ -155,92 +173,8 @@ def execute(request: WorkerRequest) -> WorkerResult:
 
 
 # ---------------------------------------------------------------- #
-# Import and flow selection
-# ---------------------------------------------------------------- #
-@contextlib.contextmanager
-def _working_directory(request: WorkerRequest) -> Iterator[Path]:
-    """Change into the flow file's directory; there is no separate ``cwd``."""
-    flow_file = Path(request.flow_file).expanduser().resolve()
-    previous = Path.cwd()
-    os.chdir(flow_file.parent)
-    try:
-        yield flow_file
-    finally:
-        os.chdir(previous)
-
-
-def _import_flow_module(path: str | Path, *, module_name: str | None = None) -> ModuleType:
-    """Verified import-by-path loader (spec §1.1)."""
-    path = Path(path).resolve()
-    if not path.is_file():
-        raise FileNotFoundError(f"flow module not found: {path}")
-
-    # A file inside a package is imported under its real dotted name so that
-    # relative imports and pickling by reference work.
-    root = path.parent
-    parts = [path.stem]
-    while (root / "__init__.py").is_file():
-        parts.insert(0, root.name)
-        root = root.parent
-    if len(parts) > 1:
-        dotted = ".".join(parts)
-        if str(root) not in sys.path:
-            sys.path.insert(0, str(root))
-        importlib.invalidate_caches()
-        return importlib.import_module(dotted)
-
-    # Standalone file: unique synthetic name, registered before exec so that
-    # dataclasses/pickle can find the module by name.
-    name = module_name or "_gui_flow_" + hashlib.sha256(str(path).encode()).hexdigest()[:12]
-    parent = str(path.parent)
-    if parent not in sys.path:
-        sys.path.insert(0, parent)
-    importlib.invalidate_caches()
-    spec = importlib.util.spec_from_file_location(name, path)
-    if spec is None or spec.loader is None:
-        raise ImportError(f"cannot load Python module from {path}")
-    module = importlib.util.module_from_spec(spec)
-    sys.modules[name] = module
-    try:
-        spec.loader.exec_module(module)
-    except BaseException:
-        sys.modules.pop(name, None)
-        raise
-    return module
-
-
-def _load_flow(request: WorkerRequest, flow_file: Path) -> tuple[str, NodeFunction, list[str]]:
-    module = _import_flow_module(flow_file)
-    nodes = find_nodes(module)
-    available = sorted(nodes)
-    selected = request.flow_name
-    if selected is None:
-        if len(available) != 1:
-            listed = ", ".join(available) if available else "none"
-            raise EngineError(
-                f"no flow selected; {len(available)} available: {listed}",
-                available_flows=available,
-            )
-        selected = available[0]
-    fn = nodes.get(selected)
-    if fn is None:
-        listed = ", ".join(available) if available else "none"
-        raise EngineError(
-            f"no flow {selected!r} in module; available: {listed}",
-            available_flows=available,
-        )
-    return selected, fn, available
-
-
-# ---------------------------------------------------------------- #
 # Plan-document seeding
 # ---------------------------------------------------------------- #
-def _require_document(document: dict[str, Any]) -> None:
-    schema = document.get("schema")
-    if schema != PLAN_SCHEMA:
-        raise EngineError(f"plan schema must be {PLAN_SCHEMA!r}, got {schema!r}")
-
-
 def _run_options(document: dict[str, Any] | None) -> RunOptions:
     raw = (document or {}).get("options") or {}
     return RunOptions(**raw)
@@ -568,31 +502,6 @@ def _node_param(raw: dict[str, Any], value: Any) -> dict[str, Any]:
         },
         editable=editable,
         note=note,
-    )
-
-
-# ---------------------------------------------------------------- #
-# Result helpers
-# ---------------------------------------------------------------- #
-def _run_result(run: Any, exc: Exception | None = None) -> RunResult:
-    if run is None:
-        if exc is None:
-            return RunResult(status="ok")
-        return RunResult(status="error", error=str(exc), error_type=type(exc).__name__)
-    error = run.error
-    return RunResult(
-        status=run.status,
-        result=jsonable(run.result),
-        run_id=run.run_id,
-        node=run.node,
-        duration_ms=run.duration_ms,
-        attempt=run.attempt,
-        started=run.started,
-        ended=run.ended,
-        log=str(run.log) if run.log is not None else None,
-        error=str(error) if error is not None else None,
-        error_type=type(error).__name__ if error is not None else None,
-        failed_nodes=[list(path) for path in run.failed_nodes],
     )
 
 
