@@ -8,24 +8,19 @@ Hand-written API reference for the `sequence_extensions` package — higher-orde
 > usage tour, one small program per aspect. Every example is executed by the
 > test suite, so the documented behaviour stays current.
 
+Architecture, execution semantics, and run-log behaviour are owned by the
+product breakdown: [components](breakdown/02-architecture/components.md),
+[flow engine](breakdown/02-architecture/flow-engine-decorators-over-the-graph-substrate.md),
+[node body](breakdown/02-architecture/node-body-and-future-consumption.md), and
+[flow-plan/2](breakdown/02-architecture/flow-plan-2-is-the-wire-contract.md).
+This page owns the per-symbol callable contract; sections that only restate
+breakdown state link there instead.
+
 ## Package layout
 
-```
-sequence_extensions/
-├── ext/        # list_ext / dict_ext / gen_ext (functional sequence helpers)
-├── graph/      # the execution substrate
-│   └── graph_future.py # GraphFuture / GraphPool
-├── flow/       # the mini flow engine
-│   ├── __init__.py    # public surface
-│   ├── _config/       # RunOptions, NodePolicy, context
-│   ├── _planning/     # DAG plan pass + flow-plan/2 document
-│   ├── _execution/    # node, attempt loop, gather, run, settle, process pool
-│   └── _recording/    # run log, records, serialization, diff
-└── flow_runner/    # the plan-file CLI
-    ├── __init__.py     # main(): parse plan.json, import, execute_plan, exit codes
-    ├── _discovery.py   # find_nodes (node scan)
-    └── __main__.py     # python -m entry point
-```
+The component decomposition and file-by-file map are owned by
+[components](breakdown/02-architecture/components.md) and the
+[implementation asset map](breakdown/03-implementation/assets.md).
 
 `ext` and `graph` names are re-exported from the package root; `flow` is imported as its own package (`from sequence_extensions.flow import node, execute_flow`).
 
@@ -754,7 +749,7 @@ def recursive_gen(item: T, iter_f: Callable[[T], T], stop_f: Optional[Callable[[
 
 ## `GraphFuture`
 
-`class GraphFuture` — a small dependency-graph future. Build a graph by passing other `GraphFuture` objects (or plain `concurrent.futures.Future` values) as arguments; dependency arguments are replaced with their results by the time the function executes. Scheduling is event-driven (callback based) with a bounded `ThreadPoolExecutor` — no polling or scheduler loop.
+`class GraphFuture` — a small dependency-graph future. Build a graph by passing other `GraphFuture` objects (or plain `concurrent.futures.Future` values) as arguments; dependency arguments are replaced with their results by the time the function executes. The scheduling model is owned by [components](breakdown/02-architecture/components.md).
 
 ### `__init__`
 
@@ -874,7 +869,7 @@ A node's `function` may return another `GraphFuture` or a plain `concurrent.futu
 
 ## `GraphPool`
 
-`class GraphPool` — evaluate a `GraphFuture` graph with a bounded thread pool. Reactor-style callbacks (not polling) drive scheduling: a leaf is submitted as soon as it is reached; dependents are submitted when their dependencies complete.
+`class GraphPool` — evaluate a `GraphFuture` graph with a bounded thread pool; the scheduling model is owned by [components](breakdown/02-architecture/components.md).
 
 ### `__init__`
 
@@ -933,12 +928,7 @@ def __exit__(self, exc_type, exc_val, exc_tb) -> None
 
 ### Lifecycle notes
 
-- The `with`-block form is **required for cleanup**; lazy use without `with` is safe (atexit shutdown).
-- Exit cancels the pool's **own** pending nodes (`result()` on those raises `CancelledError`); nodes bound to other pools survive. A node never bound to any pool is left pending — bind nodes through `pool.result()` / `pool.bind()`.
-- Re-entry (`__enter__` twice) raises `RuntimeError`.
-- Cycle detection: `pool.result()` and `pool.bind()` raise `ValueError("dependency cycle detected")` instead of deadlocking.
-- Pool ownership: a node bound to one pool cannot be bound to another; the second bind raises `ValueError` and leaves the owner running.
-- Exceptions in a node function propagate from `pool.result()`; `BaseException`s are wrapped in `RuntimeError` and settle the node.
+Pool-scoped cancellation, cycle detection, ownership, and shutdown behaviour are owned by [components](breakdown/02-architecture/components.md); a cancelled node's `result()` raises `CancelledError`, re-entry raises `RuntimeError`, and each method above lists the rest of its errors.
 
 ---
 
@@ -972,12 +962,7 @@ process-mode fan-out is built, and it cannot wait on a future either. A body
 already running inside a process worker cannot submit or return a live future.
 
 - **`__init__(max_workers=None)`** — worker process count; `None` keeps the executor's own default (the CPU count).
-- **Picklable payloads:** nodes and arguments must survive `pickle` — module-level functions and plain data. `@node`-decorated module-level functions pickle (each raw function is aliased under a unique private module name at decoration, so lambdas and factory closures do not collide). An unpicklable argument fails at dispatch: the node settles with `ProcessDispatchError` and the run log records `skipped` / `dispatch failed`.
-- **Run-log records replay in the parent:** a worker cannot write the run's open log file, so the worker buffers its attempt records and the run writes them before `run_end` — the log is still complete the moment the run returns.
-- **Dependencies resolve in the parent:** a failed dependency skips the dependent without a process round-trip (same `skipped` record as thread mode).
-- **Node defaults follow direct calls:** a node called directly inside a process worker still resolves unset policy from `RunOptions.node_defaults`; only `.submit()` and returning a live future are process-worker restrictions.
-- **Limits:** a node body running in a *process worker* cannot submit or return a live future (the worker has no pool); the root body runs on the driver, so a future it returns is bound in the parent and process-mode fan-out is built there. `execute_flow` inside a process worker is rejected in 3.0; a timed-out attempt is abandoned as a daemon thread *in the worker process*; errors must be picklable to cross the boundary.
-- Under the default *fork* start method (Linux), function closures defined at call time also pickle; under *spawn* (Windows, macOS default), module-level nodes only.
+- **Contract:** pickle transport, parent-side record replay, dependency handling, process-worker limits, and start-method differences are owned by the [flow engine](breakdown/02-architecture/flow-engine-decorators-over-the-graph-substrate.md). An unpicklable payload still names `ProcessDispatchError` and records `skipped` / `dispatch failed`.
 
 ---
 
@@ -1030,14 +1015,9 @@ def simulate(case): ...
 | `name` | function name | node name used in the run id, records, and discovery. |
 
 - `@node` returns a `NodeFunction`: still callable, and additionally `.submit(...)` schedules on the current run's pool and returns a `FlowFuture`.
-- A direct call runs inline in the caller's thread. Outside a node body it returns the body's value (waiting for a returned future if needed); inside a node body (root or pool worker) an unsettled call returns a `FlowOutcome` that the caller must return rather than block on.
-- Futures passed as arguments become dependency edges; plain `concurrent.futures.Future` values are dependencies too. Cycles raise at submit time.
-- `.submit()` is legal in the driver and in a pool worker. It does not block: it returns a future and frees the worker.
-- A node may return a value or a future. A returned future (`submit()` or `gather(...)`) is awaited by that node's attempt; the worker is freed. `.result()` on an incomplete future inside a node body (root or worker) raises `RuntimeError` with guidance instead of deadlocking. The guard covers `FlowFuture`/`FlowOutcome`: `.future.result()`, `.exception()`, `wait`/`as_completed`, plain futures, and threads a body starts itself are not inspected — blocking is rejected where the engine's own waiting API is used.
-- `gather(value)` returns one future for `value` with its futures replaced by their results. Containers keep their shape at any depth — `{"a": submit(1)}` resolves to `{"a": 1}`; lists, tuples, dicts, sets and namedtuples included, and dict keys are kept as-is. Any other `Mapping` resolves to a plain dict; orderable tuple subclasses keep their type. A bare future resolves to a one-element list, any other iterable to a list, and `[]` is accepted. `gather` needs an active run (it raises `RuntimeError` outside one). Return it from a node or pass it as a dependency (`merge.submit(gather(evals))`). A node should not return a list/dict containing futures; wrap it with `gather`.
-- A node body that calls/submits other nodes is a composite; there is no separate decorator and no separate run. Nested nodes share the run's pool and log; `path` and `parent_attempt` record the tree, and the composite's `retries`/`timeout` apply to the returned future as a whole — a retry re-runs the body (hence its subtree) with a new `parent_attempt`.
-- A `BaseException` (`SystemExit`, `KeyboardInterrupt`) from a node body is recorded and re-raised wrapped in `RuntimeError`.
-- Unset keywords resolve from the active run's `RunOptions.node_policies` for that node occurrence: an exact `NodeIdentity` key wins over a node-name key, then `node_defaults`, then the built-in default; a plan per-node policy wins over an explicit keyword.
+- Direct calls run inline; inside a node body an unsettled call returns a `FlowOutcome` to return rather than block. Futures as dependency edges, `.submit()`, composite nodes, `BaseException` wrapping, and policy resolution are owned by the [flow engine](breakdown/02-architecture/flow-engine-decorators-over-the-graph-substrate.md).
+- A node may return a value or a future; a returned future (`submit()` or `gather(...)`) is awaited by that node's attempt and frees the worker. `.result()` on an incomplete future inside a node body (root or worker) raises `RuntimeError` with guidance instead of deadlocking. The guard covers `FlowFuture`/`FlowOutcome`; `.future.result()`, `.exception()`, `wait`/`as_completed`, plain futures, and threads a body starts itself are not inspected.
+- `gather(value)` returns one future for `value` with its futures replaced by their results. Containers keep their shape at any depth — `{"a": submit(1)}` resolves to `{"a": 1}`; lists, tuples, dicts, sets and namedtuples included, and dict keys are kept as-is. Any other `Mapping` resolves to a plain dict; orderable tuple subclasses keep their type. A bare future resolves to a one-element list, any other iterable to a list, and `[]` is accepted. `gather` needs an active run (it raises `RuntimeError` outside one). Return it from a node or pass it as a dependency (`merge.submit(gather(evals))`). A node returning a list/dict containing futures is rejected; wrap it with `gather`.
 
 ### `execute_flow` — the run boundary
 
@@ -1061,26 +1041,17 @@ run = execute_flow(node, *args, options=RunOptions(...), **kwargs)
 | `parameters` | `None` | `{node or NodeIdentity: {param: value}}`; fills omitted node parameters. Exact identity wins over name; a value bound in code still wins. |
 
 - Returns a `Run`: `result`, `run_id`, `node`, `status` (`ok` / `error` / `timeout`), `log`, `duration_ms`, `attempt`, `started`, `ended`, `error`, `failed_nodes`.
-- `failed_nodes` is a tuple of node paths whose settled future carries an exception, including fire-and-forget children; `status` stays the root verdict.
-- On failure `execute_flow` raises the node's exception with `.run` attached (the last attempt's account).
+- `failed_nodes` is a tuple of node paths whose settled future carries an exception, including fire-and-forget children; `status` stays the root verdict. Failure handling and `.run` attachment are owned by the [flow engine](breakdown/02-architecture/flow-engine-decorators-over-the-graph-substrate.md).
 - `options` is a reserved keyword; pass a node parameter with that name positionally. `execute_plan` binds root parameters from the plan, so a root parameter named `options` travels positionally there too.
-- `execute_flow` is a top-level entry point. Calling it inside an active run raises `RuntimeError`; a node composes nodes directly or by returning their futures. Its first argument must be a `@node` (`NodeFunction`).
-- A thread a node body starts does not inherit the run `ContextVar`; `execute_flow` there opens a second run. Use the same thread or propagate the context.
-- `execute_flow` inside a process worker is rejected in 3.0.
-- `node.submit()` outside an active run raises `RuntimeError`.
+- `execute_flow` is a top-level entry point and its first argument must be a `@node` (`NodeFunction`). Calling it inside an active run or a process worker raises, and a thread a node body starts does not inherit the run `ContextVar`; `node.submit()` outside an active run also raises. The engine rules are owned by the [flow engine](breakdown/02-architecture/flow-engine-decorators-over-the-graph-substrate.md).
 
 ### Lifecycle
 
-- **Drain-on-return** — the run returns only after every submitted node has settled, so the log is complete on return.
-- **Failure** — a failed run cancels its own pool's pending nodes (each recorded `skipped`), waits for the running ones, records `run_end` with `status: "error"` (or `"timeout"`), and re-raises.
-- A caller-owned pool is never settled: success and failure both drain; the owner owns the lifecycle.
-- `run_id` format: `<name>-<UTC timestamp>-<short uuid>`; reference mode `<name>-fixed`.
-- Concurrent runs are safe in one process: pool exit cancels only that pool's own nodes.
-- A timed-out attempt thread cannot be preempted; its late records are dropped (`RunLog.abandon`), so the log never changes after `run_end`.
+Run ids keep the form `<name>-<UTC timestamp>-<short uuid>` (`<name>-fixed` in reference mode). Drain-on-return, failure cancellation, caller-owned pools, concurrent runs, and abandoned attempts are owned by the [flow engine](breakdown/02-architecture/flow-engine-decorators-over-the-graph-substrate.md).
 
 ### Configuration
 
-There is no global configuration. Run-level knobs travel with `execute_flow` (`RunOptions`); node-level defaults come from `RunOptions.node_defaults` (`NodePolicy`) or the decorator, and a plan document supplies per-node policy through `RunOptions.node_policies`. Precedence: **exact-identity plan policy > name-wide plan policy > explicit decorator keyword > `node_defaults` > built-in default**. `RunOptions` fields left unset take the built-in default; nothing is inherited from an enclosing run (there is none).
+There is no global configuration: run-level knobs travel with `execute_flow` (`RunOptions`), and node defaults come from `node_defaults`, the decorator, or the plan's per-node policy. Resolution and precedence are owned by the [flow engine](breakdown/02-architecture/flow-engine-decorators-over-the-graph-substrate.md); plan identity rules are owned by [override an input for one node occurrence](breakdown/01-product/planning/override-an-input-for-one-node-occurrence.md).
 
 ```python
 RunOptions(
@@ -1219,7 +1190,7 @@ Reading:
 
 `jsonable` marks cyclic and over-deep containers, maps non-finite floats to `{"float": "nan" | "inf" | "-inf"}`, disambiguates colliding dict keys, and describes unprintable objects. The writer emits strict JSON (`allow_nan=False`) and UTF-8 bytes that survive lone surrogates.
 
-Reference mode (`fixed_clock=True`) buffers records and writes them at close, in canonical order, with timing pinned to `1970-01-01T00:00:00+00:00`, `duration_ms` to `0`, `worker` to `fixed`, and nested mapping keys sorted. Identical runs produce byte-identical files — for storing logs as reference artifacts. A fixed run rejects run-level retries, and a fixed path is exclusive: a second concurrent writer raises (POSIX adds a process-level lock).
+Reference mode (`fixed_clock=True`) buffers records and writes them at close so identical runs produce byte-identical files for reference storage. The pinned fields, canonical order, retry rejection, and path exclusivity are owned by the [flow engine](breakdown/02-architecture/flow-engine-decorators-over-the-graph-substrate.md).
 
 ### Example campaign
 

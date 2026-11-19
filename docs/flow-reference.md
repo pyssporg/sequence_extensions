@@ -1,8 +1,11 @@
 # Flow and sequence reference
 
 Narrative reference for the sequence helpers, graph futures, and the flow
-engine. [docs/API.md](API.md) is the canonical per-method API reference; use it
-for signatures, parameters, and return values.
+engine. [docs/API.md](API.md) is the canonical per-method API reference; the
+engine's current-state semantics are owned by the
+[flow engine](breakdown/02-architecture/flow-engine-decorators-over-the-graph-substrate.md).
+Use this page for worked examples and API.md for signatures, parameters, and
+return values.
 
 ## list_ext
 
@@ -191,15 +194,13 @@ with GraphPool(max_workers=4) as pool:
     pool.result(fast, timeout=5)  # 42
 ```
 
-Pool lifecycle:
-
-- Use `with GraphPool(...)` for guaranteed cleanup: on exit, unbound (not-yet-completed) nodes are cancelled and their `result()` raises `CancelledError`.
-- Re-entering the same pool (`with pool:` twice) raises `RuntimeError`.
-- Lazy use without `with` is safe — the executor is created on first use and shut down at interpreter exit (atexit).
+Pool lifecycle, cancellation scope, and re-entry are owned by
+[components](breakdown/02-architecture/components.md); [API.md](API.md) lists
+the errors each method raises.
 
 ## flow
 
-The mini flow engine — parallel, deterministic, audited. A **node** is a function with retry/backoff/timeout policy; `execute_flow` opens a **run**: run identity, a bounded pool, and one JSON-lines audit log. A node body is ordinary Python — direct calls are sequential, `.submit()` is concurrent, and futures passed as arguments are dependency edges.
+The mini flow engine — parallel, deterministic, audited. A **node** is a function with retry/backoff/timeout policy; `execute_flow` opens a **run**: run identity, a bounded pool, and one JSON-lines audit log. The execution model is owned by the [flow engine](breakdown/02-architecture/flow-engine-decorators-over-the-graph-substrate.md).
 
 ```python
 from pathlib import Path
@@ -237,20 +238,14 @@ run = execute_flow(campaign, Path("cases"), options=RunOptions(max_workers=16, l
 run.result, run.run_id, run.status, run.log, run.duration_ms, run.failed_nodes
 ```
 
-Semantics, in one list:
+Run semantics — the run boundary, plain versus `.submit()` calls, retry/timeout
+policy, dependency edges, future consumption and `gather` shapes, drain and
+failure behaviour, nested nodes, log records, and process-pool limits — are
+owned by the [flow engine](breakdown/02-architecture/flow-engine-decorators-over-the-graph-substrate.md)
+and the [node-body contract](breakdown/02-architecture/node-body-and-future-consumption.md).
+The `Run`/`RunOptions` surface is in [API.md](API.md).
 
-- **`execute_flow(node, ...)` is the top-level run boundary.** It returns a `Run` (`result`, `run_id`, `node`, `status`, `log`, `duration_ms`, `attempt`, `started`, `ended`, `error`, `failed_nodes`). A failure raises the node's exception with `.run` attached. Calling it inside an active run raises: a node composes nodes, it does not open a second run.
-- **Plain call = sequential** (inline in the caller's thread: a value outside a body, a `FlowOutcome` to return inside one when the call cannot settle); **`.submit()` = concurrent** (the run's bounded pool, default 16 workers; `RunOptions(max_workers=...)`).
-- **Retries and timeouts are node attributes**: `retries=2` means up to three attempts; `timeout=30` bounds one attempt and raises `NodeTimeoutError`. Every attempt is one record in the log; zero-delay retries run in one iterative loop, never on the call stack.
-- **Futures as arguments are dependency edges** — any DAG shape, diamonds included; cycles raise at submit time.
-- **Return futures, don't block a body.** A node may return a value or a future. A returned future (`submit()` or `gather(...)`) is awaited by the node attempt; the worker is freed immediately. `.result()` on an incomplete future inside a node body — root body or pool worker — raises with guidance instead of deadlocking.
-- **`gather(...)` resolves futures in place** without a `.result()` wait and keeps the container shape: `gather({"evals": evals})` resolves to `{"evals": [...]}`, and dicts, nested lists, tuples, sets and namedtuples survive. Any other `Mapping` resolves to a plain dict; orderable tuple subclasses keep their type. A bare future becomes a one-element list, any other iterable a list, and `[]` is accepted. `gather` needs an active run. Pass the resulting future to a dependent node (`merge.submit(gather(evals))`) or return it. Return one future, never a list/dict of futures (that is rejected).
-- **Drain-on-return**: the run returns only after every submitted node settles. A failed run cancels its pending nodes (recorded `skipped`), waits for the running ones, and re-raises.
-- **Fire-and-forget failures are visible**: `run.failed_nodes` lists settled node paths with an exception, even when the root never gathered them; `run_end.failed_nodes` records the same list. `status` remains the root verdict.
-- **Nested nodes are one run and one log.** A composite is just a node that calls/submits other nodes. Node records carry `path` (the node-name chain) and `parent_attempt`; composite `retries`/`timeout` apply to the returned future as a whole. There are no child runs and no second log.
-- **The run log** (default `runs/<run_id>.jsonl`) records `run_start`, every node attempt (`ok` / `error` / `timeout` / `skipped`), and `run_end`. Paths log as path plus sha256 — bulky payloads return a `Path` by convention and never bloat the log.
-- **Read it back**: `RunLog.records(path)`, `RunLog.filter(...)`, `RunLog.summarize(path)`, and `RunLog.diff(a, b)` — record order, wall-clock, and worker identity never count as differences. Repeated identical executions are counted as a multiset (`occurrence`).
-- **Concurrent runs are safe in one process** — pool exit cancels only that pool's own nodes. CPU-bound campaigns swap threads for processes:
+CPU-bound campaigns swap threads for processes:
 
 ```python
 from sequence_extensions.flow import ProcessGraphPool, RunOptions, execute_flow
@@ -258,8 +253,6 @@ from sequence_extensions.flow import ProcessGraphPool, RunOptions, execute_flow
 with ProcessGraphPool() as pool:  # worker processes instead of threads
     run = execute_flow(campaign, cases_dir, options=RunOptions(pool=pool))
 ```
-
-Nodes and arguments must be picklable (module-level functions, plain data); each decorated function gets a unique private pickle alias, so lambdas and factory closures do not collide. Attempt records are buffered by the worker and replayed by the run, so the log is still complete on return. An unpicklable payload surfaces as `ProcessDispatchError` with a `skipped` / `dispatch failed` record. The root node body runs on the driver; that is where process-mode fan-out is built. A body already running inside a process worker cannot submit or return a live future, and `execute_flow` inside a process worker is rejected in 3.0.
 
 Two examples of the log's shape (from the acceptance test's campaign — six cases, one flaky):
 
@@ -272,7 +265,7 @@ For wrapping real simulators (subprocess timeouts, `sbatch`-and-poll for HPC), s
 
 ## Run options
 
-There is no global configuration: everything a run needs travels with the `execute_flow` call. `RunOptions` fields left unset fall back to the built-in default.
+There is no global configuration: everything a run needs travels with the `execute_flow` call. Field defaults and precedence are owned by the [flow engine](breakdown/02-architecture/flow-engine-decorators-over-the-graph-substrate.md); [API.md](API.md) has the per-field table.
 
 ```python
 from sequence_extensions.flow import NodePolicy, RunOptions, execute_flow
@@ -297,9 +290,15 @@ run = execute_flow(
 )
 ```
 
-Resolution is **exact-identity plan policy > name-wide plan policy > explicit `@node` keyword > `RunOptions.node_defaults` > built-in default**.  A `NodeIdentity` key in `RunOptions.node_policies` wins over a bare node-name key; the name key still covers every occurrence.
+Resolution precedence (exact-identity plan policy over name-wide plan policy,
+then the `@node` keyword, `node_defaults`, and the built-in default) is owned by
+the [flow engine](breakdown/02-architecture/flow-engine-decorators-over-the-graph-substrate.md);
+the per-occurrence rule is in [override an input for one node occurrence](breakdown/01-product/planning/override-an-input-for-one-node-occurrence.md).
 
-`fixed_clock = true` opts a run into **reference mode**: the run executes as if on a frozen clock, so an identical run produces a byte-identical log. The run id pins to `<node>-fixed` (a sequential run overwrites the same file instead of accumulating), every engine-written timestamp becomes `1970-01-01T00:00:00+00:00`, `duration_ms` becomes `0`, the `worker` field becomes constant, and records are written in canonical order — `run_start`, nodes by path/parent attempt/attempt/inputs, `run_end` — with nested mapping keys sorted and strict JSON. Root-level run retries are rejected with `fixed_clock` (one reference execution per file), and a fixed path is exclusive: a second concurrent writer raises (POSIX adds a process-level lock). Built for storing run logs as reference files (golden files in git) without timestamp churn; the trade is that the file holds nothing until the run returns.
+`fixed_clock = true` opts a run into **reference mode**: an identical run
+produces a byte-identical log, with the run id pinned to `<node>-fixed`. The
+pinned fields, canonical order, retry rejection, and path exclusivity are owned
+by the [flow engine](breakdown/02-architecture/flow-engine-decorators-over-the-graph-substrate.md).
 
 ## Plan document
 
@@ -344,9 +343,11 @@ Path("plan.json").write_text(json.dumps(jsonable(edited)))
 run = execute_plan(campaign, json.loads(Path("plan.json").read_text()), log="runs")
 ```
 
-- `plan_document(node, *args, options=..., **kwargs)` runs the plan pass only; nothing executes. `options` is always emitted with concrete defaults (`max_workers=16`, `summary=false`, `fixed_clock=false`, run-level `retries=0`, `retry_delay_seconds=0.0`, `timeout=null`).
-- Values stay raw Python in the document (`Path` etc.); `jsonable` serializes them, `execute_plan` decodes `{path, sha256}` back to `Path`.
-- Every node entry carries a canonical identity: `name`, `path` (the node-name chain from the run root, inclusive), and `instance` (the 1-based occurrence among submissions with the same `(name, path)` in **submission order**).  The plan pass and a real run execute the same root body, so both reproduce the identity; post-order document order does not change `instance`.  `NodeIdentity(name, path, instance)` is the public representation.
-- `apply_override` edits root values, node params and partial node `policy`, and partial `options`.  A node entry with both `path` and `instance` targets exactly one occurrence; omitting both keeps the legacy name-wide behavior (every occurrence of that name); providing only one is an error.  An unknown node, identity, parameter, policy key, or option key raises `ValueError` before execution, and the input document is not mutated.
-- `execute_plan` is the import path: it rebuilds the root kwargs, the node parameter registry, per-node `RunOptions.node_policies`, and `RunOptions` from the document, then calls `execute_flow`.  Document entries with `path`+`instance` are keyed by identity; a legacy document without them is keyed by name.  At submit the run computes the same identity; an exact identity value wins over a name-wide value, and a value bound in code still wins over both.
-- `diff_plans` compares two documents as plain data (parameters, nodes, policy, params, edges, options); there is no root comparison.
+The capabilities — preview the graph, extract settable inputs, override one
+occurrence, see an override's effect, and diff two plans — are owned by
+[see a flow](breakdown/01-product/planning/see-a-flow-before-it-runs.md),
+[extract](breakdown/01-product/planning/extract-what-a-flow-can-be-tuned-with.md),
+[override](breakdown/01-product/planning/override-an-input-for-one-node-occurrence.md),
+[see an override's effect](breakdown/01-product/planning/see-an-override-s-effect-before-the-run.md),
+and [diff](breakdown/01-product/planning/diff-two-flow-plans.md). The function
+contracts and wire shape are in [API.md](API.md).

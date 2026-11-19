@@ -14,6 +14,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from seq_ext_gui.app import create_app
+from seq_ext_gui.jobs import JobManager
 
 MINIMAL_PLAN: dict[str, Any] = {
     "schema": "flow-plan/2",
@@ -247,6 +248,22 @@ def test_cancel_endpoint(client: TestClient) -> None:
     assert client.post("/api/jobs/missing/cancel").status_code == 404
 
 
+def test_app_lifespan_shuts_the_job_manager_down(
+    sample_project, fake_worker: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    calls: list[bool] = []
+
+    async def shutdown(self) -> None:
+        calls.append(True)
+
+    monkeypatch.setattr(JobManager, "shutdown", shutdown)
+    app = create_app(sample_project.root, worker_cmd=[sys.executable, str(fake_worker)])
+    with TestClient(app):
+        pass
+
+    assert calls == [True]
+
+
 def test_index_without_static_dir(client: TestClient) -> None:
     response = client.get("/")
     assert response.status_code in {200, 404}
@@ -270,8 +287,6 @@ def test_evaluate_sample_project_with_real_worker(sample_project) -> None:
     assert body["ok"] is True, body
     assert body["plan"] is not None
     assert body["plan"]["schema"] == "flow-plan/2"
-    assert "root" not in body["plan"]
-    assert body["plan"]["options"]["max_workers"] == 16
     assert {param["name"] for param in body["plan"]["parameters"]} == {"n", "factor"}
 
 

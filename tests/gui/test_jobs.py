@@ -119,6 +119,23 @@ def test_cancel_kills_and_is_idempotent(tmp_path: Path, fake_worker: Path) -> No
     asyncio.run(run())
 
 
+def test_shutdown_cancels_unfinished_jobs(tmp_path: Path, fake_worker: Path) -> None:
+    async def run() -> None:
+        manager = make_manager(tmp_path, fake_worker, job_timeout=60.0)
+        job_id = await manager.start(JobRequest(flow_file="slow.py"))
+        await wait_for(lambda: manager.status(job_id).state == "running")
+
+        await manager.shutdown()
+
+        status = manager.status(job_id)
+        assert status is not None and status.state == "cancelled"
+        task = manager._jobs[job_id].task
+        assert task is not None
+        await asyncio.wait_for(task, timeout=5.0)
+
+    asyncio.run(run())
+
+
 def test_cancel_finished_job_is_a_noop(tmp_path: Path, fake_worker: Path) -> None:
     async def run() -> None:
         manager = make_manager(tmp_path, fake_worker)

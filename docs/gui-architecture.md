@@ -3,29 +3,16 @@
 Current-state facts live in the repository breakdown at `docs/breakdown/`; this
 document is derived implementation narrative.
 
-The GUI (`src/seq_ext_gui/`, shipped by the same distribution behind the `gui`
-extra, tested in `tests/gui/`) is a thin, offline, local presentation layer
-around the `sequence_extensions` flow engine. It never imports user flow code
-into the web process.
-
-```
-browser (vanilla JS, SVG graph)
-   |  JSON + SSE
-FastAPI app (app.py, files.py, jobs.py)
-   |  one subprocess per evaluate/execute, request/result JSON files
-worker.py -> engine.py -> sequence_extensions API
-```
-
-## Hard invariants
-
-1. `app.py`, `jobs.py`, `files.py` never import `sequence_extensions` or a user
-   flow module. Only `engine.py` does, and only inside the worker process.
-2. `engine.py` uses only `plan_document`, `apply_override`, `execute_plan`,
-   `RunOptions`, `NodePolicy`, `jsonable`, and `find_nodes`. No engine logic is
-   copied.
-3. Every evaluate/execute gets a fresh worker process and a fresh job directory.
-4. Values the flow binds explicitly are not overridable and are shown read-only.
-5. No CDN, no network assets, no build step in `static/`.
+The GUI is a thin, offline, local presentation layer around the
+`sequence_extensions` flow engine. The process split, subprocess isolation, path
+confinement, and the one-way engine border are owned by
+[how the GUI is split into processes](breakdown/02-architecture/gui-application/how-the-gui-is-split-into-processes.md),
+[why every job runs in a subprocess](breakdown/02-architecture/gui-application/why-every-job-runs-in-a-subprocess.md),
+[how project paths are confined](breakdown/02-architecture/gui-application/how-project-paths-are-confined.md),
+and [how the GUI stays decoupled from the engine](breakdown/02-architecture/gui-application/how-the-gui-stays-decoupled-from-the-engine.md).
+Explicit code bindings are not overridable; the override route and its
+precedence are owned by [how overrides reach the engine](breakdown/02-architecture/gui-application/how-overrides-reach-the-engine.md)
+and [override an input for one node occurrence](breakdown/01-product/planning/override-an-input-for-one-node-occurrence.md).
 
 ## Wire contract
 
@@ -73,10 +60,12 @@ file for SSE.
 
 ```python
 def plan(request: WorkerRequest) -> WorkerResult
+def discover(request: WorkerRequest) -> WorkerResult
 def execute(request: WorkerRequest) -> WorkerResult
 ```
 
-`plan` builds the wire plan without executing user node bodies:
+`discover` returns node cards from the module signature and executes no node
+body. `plan` builds the wire plan without executing user node bodies:
 
 1. Import the flow file by absolute path (verified loader: package-aware branch,
    `sys.modules` registration before `exec_module`, parent on `sys.path`); the
@@ -95,7 +84,7 @@ def execute(request: WorkerRequest) -> WorkerResult
    node without identity (legacy plan) or with an identity the fresh plan no
    longer contains is skipped with a warning; there is no name-wide fallback.
    Seed `options` are not applied twice — they were already used to plan.
-7. Return a `WirePlan` with the editability heuristic below. `editable`/`note`
+7. Return the annotated plan dict with the editability heuristic below. `editable`/`note`
    come from the freshly generated document (code values); the overlaid values
    are displayed, so an edited parameter that was re-evaluated stays editable.
 8. No runner-config object and no separate `cwd`; the working directory is
@@ -107,7 +96,7 @@ def execute(request: WorkerRequest) -> WorkerResult
 10. Import and select the flow, then
     `execute_plan(fn, request.plan, log=request.log_dir)`. Do not re-plan: the
     plan document is authoritative.
-11. Return `ok=true` with `run` and the executed plan as a `WirePlan`; on a flow
+11. Return `ok=true` with `run` and the annotated executed-plan dict; on a flow
     exception, use `exc.run` when present and map it to `RunResult`; never
     swallow. `run.result` is passed through `jsonable`.
 
@@ -131,9 +120,10 @@ def execute(request: WorkerRequest) -> WorkerResult
 |---|---|---|
 | GET | `/api/health` | `HealthResponse` |
 | PUT | `/api/root` | `{"path": str}` -> `HealthResponse`; switches the active root |
-| GET | `/api/tree?path=` | `TreeResponse`; dirs plus `*.py`/`*.json` files, hidden and `__pycache__`/`.git`/`.venv`/`runs` skipped |
+| GET | `/api/tree?path=` | `TreeResponse`; dirs plus `*.py`/`*.json` files, hidden entries and `__pycache__`/`.git`/`.venv`/`runs`/`.seq_ext_gui` skipped |
 | GET | `/api/file?path=` | `FileContent`; read `.py`/`.json` under the project root |
 | POST | `/api/evaluate` | `JobRequest` -> `WorkerResult` (synchronous, spawned worker) |
+| POST | `/api/discover` | `JobRequest` -> `WorkerResult`; node cards, no plan and no execution |
 | POST | `/api/execute` | `JobRequest` -> `{"job_id": str}` |
 | GET | `/api/jobs/{id}` | `JobStatus` |
 | GET | `/api/jobs/{id}/events` | SSE: `status` | `log` | `done` events |
@@ -141,16 +131,17 @@ def execute(request: WorkerRequest) -> WorkerResult
 
 There is no project-file write endpoint: the GUI does not save project files. All
 `path`/`flow_file` values are resolved against the configured project root;
-anything outside it is rejected with HTTP 400. `project_root` comes from
-`seq-ext-gui --project-root`, else `SEQ_EXT_GUI_PROJECT_ROOT`, else the current
-directory. `PUT /api/root` replaces it at runtime; browsing and new jobs follow
-the active root, while a running job keeps the root it started with.
+anything outside it is rejected with HTTP 400; `ValueError` maps to 400 and an
+unknown job id to 404. `project_root` comes from `seq-ext-gui --project-root`,
+else `SEQ_EXT_GUI_PROJECT_ROOT`, else the current directory. `PUT /api/root`
+replaces it at runtime; browsing and new jobs follow the active root, while a
+running job keeps the root it started with.
 
 SSE event shapes:
 
 ```
 event: status
-data: {"state": "running"}          (also queued/cancelled)
+data: {"state": "running"}          (also queued/succeeded/failed/cancelled)
 
 event: log
 data: {"record": {...}}             (one parsed JSONL run-log record)
@@ -163,37 +154,14 @@ The stream closes after `done`. Late subscribers get the current status first.
 
 ## Frontend
 
-Two vertical panels, per the product request:
+The two-panel layout, file tree, toolbar, graph, parameter widgets, and
+run-option placement are owned by
+[what the browser UI consists of](breakdown/03-implementation/gui-application/what-the-browser-ui-consists-of.md).
 
-- Left: project-root field with **Open**, a nested project file tree (`.py`/`.json`)
-  where directories expand in place (children fetched lazily per directory and
-  cached) and the selected flow file stays marked, and **Evaluate**. **Import plan**, **Export plan** and the plan status sit in the
-  graph toolbar, with the import file input.
-- Right: SVG DAG (oriented top-to-bottom, layered by longest path), node click
-  selects it and opens the parameter and policy editor in a side column,
-  **Execute** button, live run log, result banner. The side column also holds
-  the run-option fields; they show while the flow root (or nothing) is selected
-  and are hidden when a concrete node takes over the column.
-
-Clicking a `.json` file in the tree imports it; clicking a `.py` file selects
-the workflow. Expanding a directory fetches only that level. The single
-**Open**/**Refresh** button beside the root field opens a typed root or, when
-the path is unchanged, re-fetches the root and every expanded directory while
-preserving the expanded set. Import requires `schema === "flow-plan/2"` and runs Evaluate so
-the engine validates and refreshes the document against the selected workflow;
-with no flow selected the UI shows a clear message. Export downloads
-`planDocument(state.plan)` as `plan.json`.
-
-Root inputs and node parameters mutate `state.plan.parameters[]` and the
-selected `state.plan.nodes[].params[]` directly; the policy editor mutates the
-selected `state.plan.nodes[].policy`; option fields mutate
-`state.plan.options`. Repeated nodes are shown and edited as `name #instance`,
-so one edit never touches a sibling occurrence. Any edit marks the plan dirty
-and re-enables Evaluate. `buildPayload()` returns
-`{flow_file, flow_name, plan}`; Evaluate sends the current plan (if any) as the
-seed, Execute sends it and requires one.
-
-Editable parameter widgets derive from `Param.type`: `bool` checkbox, `int`/
-`float` number input, `Path`/`str` text input, `list`/`dict` JSON textarea.
-Read-only params render disabled with their `note` as a tooltip. The displayed
-root-node label is the selected or evaluated flow name, not a plan field.
+The GUI-only payload is `{flow_file, flow_name, plan}`: Evaluate sends the
+current plan (if any) as the seed, Execute sends it and requires one, and Export
+downloads `planDocument(state.plan)` as `plan.json`. Import requires
+`schema === "flow-plan/2"` and re-runs Evaluate so the engine validates and
+refreshes the document against the selected workflow. Export and execution
+strip the GUI-only `editable`/`note` annotations (`planDocument()` in the
+browser; `to_document()` in the Python worker).

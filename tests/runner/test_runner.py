@@ -22,15 +22,6 @@ from sequence_extensions.flow_runner import find_nodes, main
 REPO_ROOT = Path(__file__).resolve().parents[2]
 TESTS_DIR = REPO_ROOT / "tests"
 
-DEFAULT_OPTIONS = {
-    "max_workers": 16,
-    "summary": False,
-    "fixed_clock": False,
-    "retries": 0,
-    "retry_delay_seconds": 0.0,
-    "timeout": None,
-}
-
 
 # --------------------------------------------------------------- #
 # Plan fixtures
@@ -57,13 +48,15 @@ def node_entry(name, params=()):
     }
 
 
-def plan_document(*, parameters=(), nodes=(), edges=(), options=None, schema="flow-plan/2"):
+def plan_document(
+    *, default_options, parameters=(), nodes=(), edges=(), options=None, schema="flow-plan/2"
+):
     return {
         "schema": schema,
         "parameters": list(parameters),
         "nodes": list(nodes),
         "edges": list(edges),
-        "options": {**DEFAULT_OPTIONS, **(options or {})},
+        "options": {**default_options, **(options or {})},
     }
 
 
@@ -73,10 +66,11 @@ def write_plan(tmp_path, document, name="plan.json"):
     return path
 
 
-def echo_plan(tmp_path, *, value=21, factor=2, options=None):
+def echo_plan(tmp_path, *, default_options, value=21, factor=2, options=None):
     return write_plan(
         tmp_path,
         plan_document(
+            default_options=default_options,
             parameters=[
                 param("value", value, type="int", required=True),
                 param("factor", factor, type="int", default=1),
@@ -92,10 +86,10 @@ def echo_plan(tmp_path, *, value=21, factor=2, options=None):
     )
 
 
-def failing_plan(tmp_path):
+def failing_plan(tmp_path, *, default_options):
     return write_plan(
         tmp_path,
-        plan_document(nodes=[node_entry("failing")]),
+        plan_document(default_options=default_options, nodes=[node_entry("failing")]),
     )
 
 
@@ -120,8 +114,8 @@ def test_find_nodes_scans_the_module():
 # --------------------------------------------------------------- #
 # Running
 # --------------------------------------------------------------- #
-def test_runs_the_selected_flow(tmp_path, capsys):
-    plan = echo_plan(tmp_path)
+def test_runs_the_selected_flow(tmp_path, capsys, default_options):
+    plan = echo_plan(tmp_path, default_options=default_options)
     logs = tmp_path / "logs"
     assert run_plan(plan, "echo", log=logs) == 0
     out = capsys.readouterr().out
@@ -132,12 +126,12 @@ def test_runs_the_selected_flow(tmp_path, capsys):
     assert log_file.exists()
 
 
-def test_auto_selects_the_only_node(tmp_path, capsys):
+def test_auto_selects_the_only_node(tmp_path, capsys, default_options):
     (tmp_path / "singleflow.py").write_text(
         "from sequence_extensions.flow import node\n@node\ndef solo():\n    return 7\n",
         encoding="utf-8",
     )
-    plan = write_plan(tmp_path, plan_document())
+    plan = write_plan(tmp_path, plan_document(default_options=default_options))
     sys.path.insert(0, str(tmp_path))
     try:
         assert main([str(plan), "--module", "singleflow", "--log", str(tmp_path / "logs")]) == 0
@@ -149,10 +143,11 @@ def test_auto_selects_the_only_node(tmp_path, capsys):
     assert "result: 7" in out
 
 
-def test_flow_flag_overrides_selection(tmp_path, capsys):
+def test_flow_flag_overrides_selection(tmp_path, capsys, default_options):
     plan = write_plan(
         tmp_path,
         plan_document(
+            default_options=default_options,
             parameters=[param("values", [1, 2], type="list", required=True)],
             nodes=[node_entry("double", [param("values", [1, 2], type="list")])],
         ),
@@ -161,15 +156,17 @@ def test_flow_flag_overrides_selection(tmp_path, capsys):
     assert "result: [2, 3]" in capsys.readouterr().out
 
 
-def test_plan_from_stdin(tmp_path, capsys, monkeypatch):
-    plan = echo_plan(tmp_path)
+def test_plan_from_stdin(tmp_path, capsys, monkeypatch, default_options):
+    plan = echo_plan(tmp_path, default_options=default_options)
     monkeypatch.setattr(sys, "stdin", io.StringIO(plan.read_text(encoding="utf-8")))
     assert main(["-", "--module", "runner.flows", "--flow", "echo", "--log", str(tmp_path)]) == 0
     assert "result: 42" in capsys.readouterr().out
 
 
-def test_options_come_from_the_plan(tmp_path, capsys):
-    plan = echo_plan(tmp_path, options={"max_workers": 3, "fixed_clock": True})
+def test_options_come_from_the_plan(tmp_path, capsys, default_options):
+    plan = echo_plan(
+        tmp_path, default_options=default_options, options={"max_workers": 3, "fixed_clock": True}
+    )
     assert run_plan(plan, "echo", log=tmp_path) == 0
     assert "flow echo: ok" in capsys.readouterr().out
 
@@ -182,16 +179,17 @@ def test_list_flag_prints_flows(capsys):
     assert "double" in out
 
 
-def test_failing_flow_exits_one(tmp_path, capsys):
-    plan = failing_plan(tmp_path)
+def test_failing_flow_exits_one(tmp_path, capsys, default_options):
+    plan = failing_plan(tmp_path, default_options=default_options)
     assert run_plan(plan, "failing", log=tmp_path) == 1
     captured = capsys.readouterr()
     assert "flow failing: error" in captured.out
     assert "boom" in captured.err
 
 
-def test_node_policy_from_the_plan(tmp_path, capsys):
+def test_node_policy_from_the_plan(tmp_path, capsys, default_options):
     document = plan_document(
+        default_options=default_options,
         parameters=[param("value", 3, type="int", required=True)],
         nodes=[
             {
@@ -225,8 +223,10 @@ def test_invalid_json(tmp_path, capsys):
     assert "invalid JSON" in capsys.readouterr().err
 
 
-def test_wrong_schema(tmp_path, capsys):
-    plan = write_plan(tmp_path, plan_document(schema="flow-plan/1"))
+def test_wrong_schema(tmp_path, capsys, default_options):
+    plan = write_plan(
+        tmp_path, plan_document(default_options=default_options, schema="flow-plan/1")
+    )
     assert main([str(plan), "--module", "runner.flows"]) == 2
     assert "expected schema 'flow-plan/2'" in capsys.readouterr().err
 
@@ -236,32 +236,33 @@ def test_missing_plan_argument(tmp_path, capsys):
     assert "no plan given" in capsys.readouterr().err
 
 
-def test_module_not_importable(tmp_path, capsys):
-    plan = echo_plan(tmp_path)
+def test_module_not_importable(tmp_path, capsys, default_options):
+    plan = echo_plan(tmp_path, default_options=default_options)
     assert main([str(plan), "--module", "no.such.module"]) == 2
     assert "cannot import module" in capsys.readouterr().err
 
 
-def test_no_flow_selected(tmp_path, capsys):
-    plan = echo_plan(tmp_path)
+def test_no_flow_selected(tmp_path, capsys, default_options):
+    plan = echo_plan(tmp_path, default_options=default_options)
     assert main([str(plan), "--module", "runner.flows"]) == 2
     err = capsys.readouterr().err
     assert "no flow selected" in err
     assert "echo" in err and "double" in err
 
 
-def test_unknown_flow_lists_alternatives(tmp_path, capsys):
-    plan = echo_plan(tmp_path)
+def test_unknown_flow_lists_alternatives(tmp_path, capsys, default_options):
+    plan = echo_plan(tmp_path, default_options=default_options)
     assert main([str(plan), "--module", "runner.flows", "--flow", "nope"]) == 2
     err = capsys.readouterr().err
     assert "no flow 'nope'" in err
     assert "echo" in err and "double" in err
 
 
-def test_missing_required_input(tmp_path, capsys):
+def test_missing_required_input(tmp_path, capsys, default_options):
     plan = write_plan(
         tmp_path,
         plan_document(
+            default_options=default_options,
             parameters=[param("value", None, type="int", required=True)],
             nodes=[],
         ),
@@ -273,8 +274,8 @@ def test_missing_required_input(tmp_path, capsys):
 # --------------------------------------------------------------- #
 # python -m entry point
 # --------------------------------------------------------------- #
-def test_python_m_entry(tmp_path):
-    plan = echo_plan(tmp_path)
+def test_python_m_entry(tmp_path, default_options):
+    plan = echo_plan(tmp_path, default_options=default_options)
     env = {**os.environ, "PYTHONPATH": str(TESTS_DIR)}
     result = subprocess.run(
         [

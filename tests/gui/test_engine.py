@@ -9,15 +9,6 @@ from pathlib import Path
 from seq_ext_gui.contracts import WorkerRequest, to_document
 from seq_ext_gui.engine import _override_from_seed, discover, execute, plan
 
-DEFAULT_OPTIONS = {
-    "max_workers": 16,
-    "summary": False,
-    "fixed_clock": False,
-    "retries": 0,
-    "retry_delay_seconds": 0.0,
-    "timeout": None,
-}
-
 
 def _request(sample_project, **kwargs) -> WorkerRequest:
     values = {"mode": "plan", "flow_file": str(sample_project.flow), "flow_name": "root"}
@@ -33,7 +24,7 @@ def test_plan_requires_a_flow_when_ambiguous(sample_project) -> None:
     assert "no flow selected" in (result.error or "")
 
 
-def test_plan_emits_the_v2_document_shape(sample_project) -> None:
+def test_plan_emits_the_v2_document_shape(sample_project, default_options) -> None:
     result = plan(_request(sample_project))
 
     assert result.ok, result.error
@@ -41,7 +32,7 @@ def test_plan_emits_the_v2_document_shape(sample_project) -> None:
     document = to_document(result.plan)
     assert document["schema"] == "flow-plan/2"
     assert "root" not in document
-    assert document["options"] == DEFAULT_OPTIONS
+    assert document["options"] == default_options
     assert {node["name"] for node in document["nodes"]} >= {"double", "scale", "gather"}
     assert all(node["path"][0] == "root" for node in document["nodes"] if node["name"] != "gather")
     assert {node["instance"] for node in document["nodes"] if node["name"] == "scale"} == {1, 2}

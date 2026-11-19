@@ -52,14 +52,10 @@ testpaths = ["tests"]
 xfail_strict = true
 addopts = "-ra"
 markers = [
-  "level_static",
   "level_unit",
   "level_component",
-  "level_contract",
   "level_integration",
   "level_system",
-  "level_acceptance",
-  "slow",
   "flaky_timing: asserts a wall-clock bound or uses sleeps for synchronisation",
   "integration: end-to-end tests that spawn the real worker subprocess",
 ]

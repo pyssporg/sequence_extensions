@@ -31,15 +31,6 @@ from sequence_extensions.flow import (
     plan_manifest,
 )
 
-_DEFAULT_OPTIONS = {
-    "max_workers": 16,
-    "summary": False,
-    "fixed_clock": False,
-    "retries": 0,
-    "retry_delay_seconds": 0.0,
-    "timeout": None,
-}
-
 
 def _make_campaign():
     """The supported inline fan-out shape from the design discussion."""
@@ -76,7 +67,7 @@ def _write_cases(tmp_path, *names):
         (tmp_path / name).write_text("x")
 
 
-def test_plan_document_returns_the_v2_document(tmp_path):
+def test_plan_document_returns_the_v2_document(tmp_path, default_options):
     """plan_document() returns the flow-plan/2 document without running anything."""
     _write_cases(tmp_path, "a.csv", "b.csv", "c.csv")
     campaign, ran = _make_campaign()
@@ -138,7 +129,7 @@ def test_plan_document_returns_the_v2_document(tmp_path):
         {"from": 7, "to": 6},
     ]
     # Options are always concrete; run-only fields (log) never appear.
-    assert doc["options"] == _DEFAULT_OPTIONS
+    assert doc["options"] == default_options
     # Nothing ran, and no run log was written.
     assert ran == {"simulate": 0, "evaluate": 0, "verdict": 0}
     assert not logs_dir.exists()
@@ -325,15 +316,15 @@ def test_apply_override_merges_node_policy_before_validating(tmp_path):
     assert doc["nodes"][1]["policy"]["retries"] == 1
 
 
-def test_apply_override_merges_options_partially(tmp_path):
+def test_apply_override_merges_options_partially(tmp_path, default_options):
     _write_cases(tmp_path, "a.csv")
     campaign, _ran = _make_campaign()
     doc = plan_document(campaign, tmp_path, 0.5, tmp_path / "out")
 
     overridden = apply_override(doc, {"options": {"max_workers": 4}})
 
-    assert overridden["options"] == {**_DEFAULT_OPTIONS, "max_workers": 4}
-    assert doc["options"] == _DEFAULT_OPTIONS
+    assert overridden["options"] == {**default_options, "max_workers": 4}
+    assert doc["options"] == default_options
 
 
 def test_apply_override_unknown_names_and_keys_raise_valueerror(tmp_path):

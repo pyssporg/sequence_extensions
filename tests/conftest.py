@@ -18,6 +18,18 @@ def pytest_sessionfinish(session):
 
 
 @pytest.fixture
+def default_options():
+    return {
+        "max_workers": 16,
+        "summary": False,
+        "fixed_clock": False,
+        "retries": 0,
+        "retry_delay_seconds": 0.0,
+        "timeout": None,
+    }
+
+
+@pytest.fixture
 def simple_int_list():
     return list_ext([1, 2, 3, 4])
 

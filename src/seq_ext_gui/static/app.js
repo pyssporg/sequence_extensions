@@ -145,11 +145,15 @@ async function boot() {
 
 // ---------------------------------------------------------- project files ----
 
+async function readDir(path) {
+  const data = await api(`/api/tree?path=${encodeURIComponent(path)}`);
+  return Array.isArray(data?.entries) ? data.entries : [];
+}
+
 async function fetchDir(path, token) {
   if (state.children.has(path)) return state.children.get(path);
-  const data = await api(`/api/tree?path=${encodeURIComponent(path)}`);
+  const entries = await readDir(path);
   if (token !== treeToken) return null;
-  const entries = Array.isArray(data?.entries) ? data.entries : [];
   state.children.set(path, entries);
   return entries;
 }
@@ -188,8 +192,7 @@ async function refreshTree() {
   const results = await Promise.all(
     dirs.map(async (path) => {
       try {
-        const data = await api(`/api/tree?path=${encodeURIComponent(path)}`);
-        return { path, entries: Array.isArray(data?.entries) ? data.entries : [] };
+        return { path, entries: await readDir(path) };
       } catch (error) {
         return { path, error };
       }
@@ -611,26 +614,33 @@ function buildRootPreview(card) {
   };
 }
 
-function applyPreviewPlan(card) {
-  const preview = buildRootPreview(card);
-  state.plan = preview;
-  state.preview = true;
+function showPlanView(plan, { preview, status, emptyText }) {
+  state.plan = plan;
+  state.preview = preview;
   state.selectedId = ROOT_NODE_ID;
   state.dirty = false;
   ui.dirtyHint.classList.add("hidden");
-  ui.execute.disabled = true;
-  ui.exportPlan.disabled = true;
-  ui.planStatus.textContent = "preview";
+  ui.execute.disabled = preview;
+  ui.exportPlan.disabled = preview;
+  ui.planStatus.textContent = status;
   ui.graphEmpty.classList.add("hidden");
   syncOptions();
   setOptionsEnabled(true);
-  renderGraph(ui.graph, preview, {
+  renderGraph(ui.graph, plan, {
     onSelect: selectNode,
     selectedId: ROOT_NODE_ID,
     rootLabel: state.flowName || "",
-    emptyText: "Fill required inputs, then Evaluate.",
+    emptyText,
   });
   renderNodeEditor();
+}
+
+function applyPreviewPlan(card) {
+  showPlanView(buildRootPreview(card), {
+    preview: true,
+    status: "preview",
+    emptyText: "Fill required inputs, then Evaluate.",
+  });
 }
 
 // Convert a wire/imported plan into the pure engine document. Display-only
@@ -680,24 +690,11 @@ function buildPayload() {
 }
 
 function applyPlan(plan) {
-  state.plan = plan;
-  state.preview = false;
-  state.selectedId = ROOT_NODE_ID;
-  state.dirty = false;
-  ui.dirtyHint.classList.add("hidden");
-  ui.execute.disabled = false;
-  ui.exportPlan.disabled = false;
-  ui.planStatus.textContent = PLAN_SCHEMA;
-  ui.graphEmpty.classList.add("hidden");
-  syncOptions();
-  setOptionsEnabled(true);
-  renderGraph(ui.graph, plan, {
-    onSelect: selectNode,
-    selectedId: ROOT_NODE_ID,
-    rootLabel: state.flowName || "",
+  showPlanView(plan, {
+    preview: false,
+    status: PLAN_SCHEMA,
     emptyText: "Root flow — no child nodes.",
   });
-  renderNodeEditor();
 }
 
 async function importPlanText(text, label) {
@@ -765,12 +762,8 @@ function validateRequiredInputs() {
       missing.push(param.name);
       continue;
     }
-    if (
-      typeof value === "object" &&
-      !Array.isArray(value) &&
-      typeof value.path === "string" &&
-      value.path.trim() === ""
-    ) {
+    const path = pathValue(value);
+    if (path !== null && path.trim() === "") {
       missing.push(param.name);
     }
   }
@@ -851,6 +844,14 @@ function widgetKind(type) {
   return "text";
 }
 
+// Numeric coercion shared by the parameter, policy, and option fields.
+function toNumber(text, integer) {
+  const value = Number(text);
+  if (!Number.isFinite(value)) return null;
+  if (integer && !Number.isInteger(value)) return null;
+  return value;
+}
+
 function buildParam(param, commit) {
   const editable = param.editable !== false;
   const kind = widgetKind(param.type);
@@ -910,8 +911,8 @@ function buildParam(param, commit) {
         setError("enter a number");
         return;
       }
-      const number = Number(text);
-      if (!Number.isFinite(number) || (kind === "int" && !Number.isInteger(number))) {
+      const number = toNumber(text, kind === "int");
+      if (number === null) {
         setError(kind === "int" ? "not an integer" : "not a number");
         return;
       }
@@ -968,15 +969,16 @@ function buildParam(param, commit) {
   return row;
 }
 
+// A Path parameter travels as {path, sha256}; its path string, else null.
+function pathValue(value) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  return typeof value.path === "string" ? value.path : null;
+}
+
 function displayParamValue(value, type) {
-  if (
-    String(type || "").toLowerCase().includes("path") &&
-    value &&
-    typeof value === "object" &&
-    !Array.isArray(value) &&
-    typeof value.path === "string"
-  ) {
-    return value.path;
+  if (String(type || "").toLowerCase().includes("path")) {
+    const path = pathValue(value);
+    if (path !== null) return path;
   }
   return value;
 }
@@ -1050,12 +1052,8 @@ function parsePolicyField(text, kind, allowEmpty) {
   if (text.trim() === "") {
     return allowEmpty ? { value: null } : { error: "enter a number" };
   }
-  const number = Number(text);
-  if (
-    !Number.isFinite(number) ||
-    number < 0 ||
-    (kind === "int" && !Number.isInteger(number))
-  ) {
+  const number = toNumber(text, kind === "int");
+  if (number === null || number < 0) {
     return { error: kind === "int" ? "not a non-negative integer" : "not a non-negative number" };
   }
   return { value: number };
@@ -1551,9 +1549,8 @@ function readOptions() {
   const number = (input, integer, minimum) => {
     const text = input.value.trim();
     if (text === "") return null;
-    const value = Number(text);
-    if (!Number.isFinite(value) || value < minimum) return null;
-    if (integer && !Number.isInteger(value)) return null;
+    const value = toNumber(text, integer);
+    if (value === null || value < minimum) return null;
     return value;
   };
   const maxWorkers = number(ui.optMaxWorkers, true, 1);

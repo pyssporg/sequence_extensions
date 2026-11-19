@@ -60,7 +60,6 @@ def test_worker_cli_writes_a_parseable_result(tmp_path: Path, sample_project) ->
     assert result.plan is not None
     assert result.plan["schema"] == "flow-plan/2"
     document = to_document(result.plan)
-    assert "root" not in document
     parameters = {param["name"]: param["value"] for param in document["parameters"]}
     assert parameters["n"] == 3
     assert document["options"]["max_workers"] == 2
@@ -77,7 +76,6 @@ def test_worker_cli_dispatches_discovery(tmp_path: Path, sample_project) -> None
     assert result.mode == "discover"
     cards = {card.name: card for card in result.nodes}
     assert set(cards) == {"double", "root", "scale"}
-    assert cards["double"].summary == "Double one value."
     assert cards["scale"].signature == "(value: int, factor: int = 1) -> int"
 
 

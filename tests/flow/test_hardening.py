@@ -631,7 +631,7 @@ def _write_runner_module(tmp_path):
     )
 
 
-def _write_runner_plan(tmp_path, flow, values=None):
+def _write_runner_plan(tmp_path, flow, values=None, *, options):
     parameters = [
         {"name": name, "type": "", "required": False, "default": None, "value": value}
         for name, value in (values or {}).items()
@@ -656,25 +656,18 @@ def _write_runner_plan(tmp_path, flow, values=None):
         "parameters": parameters,
         "nodes": nodes,
         "edges": [],
-        "options": {
-            "max_workers": 16,
-            "summary": False,
-            "fixed_clock": False,
-            "retries": 0,
-            "retry_delay_seconds": 0.0,
-            "timeout": None,
-        },
+        "options": dict(options),
     }
     plan = tmp_path / "plan.json"
     plan.write_text(json.dumps(document), encoding="utf-8")
     return plan
 
 
-def test_runner_passes_an_options_parameter_positionally(tmp_path):
+def test_runner_passes_an_options_parameter_positionally(tmp_path, default_options):
     from sequence_extensions.flow_runner import main
 
     _write_runner_module(tmp_path)
-    plan = _write_runner_plan(tmp_path, "opt", {"options": 7})
+    plan = _write_runner_plan(tmp_path, "opt", {"options": 7}, options=default_options)
     sys.path.insert(0, str(tmp_path))
     try:
         assert main([str(plan), "--module", "optmod", "--flow", "opt", "--log", str(tmp_path)]) == 0
@@ -683,11 +676,13 @@ def test_runner_passes_an_options_parameter_positionally(tmp_path):
         sys.modules.pop("optmod", None)
 
 
-def test_runner_passes_options_after_other_positional_inputs(tmp_path):
+def test_runner_passes_options_after_other_positional_inputs(tmp_path, default_options):
     from sequence_extensions.flow_runner import main
 
     _write_runner_module(tmp_path)
-    plan = _write_runner_plan(tmp_path, "pair", {"x": 1, "options": 2, "y": 3})
+    plan = _write_runner_plan(
+        tmp_path, "pair", {"x": 1, "options": 2, "y": 3}, options=default_options
+    )
     sys.path.insert(0, str(tmp_path))
     try:
         assert (
@@ -698,11 +693,11 @@ def test_runner_passes_options_after_other_positional_inputs(tmp_path):
         sys.modules.pop("optmod", None)
 
 
-def test_runner_rejects_keyword_only_options_as_usage_error(tmp_path):
+def test_runner_rejects_keyword_only_options_as_usage_error(tmp_path, default_options):
     from sequence_extensions.flow_runner import main
 
     _write_runner_module(tmp_path)
-    plan = _write_runner_plan(tmp_path, "kwonly", {"options": 4})
+    plan = _write_runner_plan(tmp_path, "kwonly", {"options": 4}, options=default_options)
     sys.path.insert(0, str(tmp_path))
     try:
         assert main([str(plan), "--module", "optmod", "--flow", "kwonly"]) == 2
@@ -711,11 +706,11 @@ def test_runner_rejects_keyword_only_options_as_usage_error(tmp_path):
         sys.modules.pop("optmod", None)
 
 
-def test_runner_import_time_exception_is_a_usage_error(tmp_path):
+def test_runner_import_time_exception_is_a_usage_error(tmp_path, default_options):
     from sequence_extensions.flow_runner import main
 
     (tmp_path / "boommod.py").write_text("raise RuntimeError('import boom')\n")
-    plan = _write_runner_plan(tmp_path, "x")
+    plan = _write_runner_plan(tmp_path, "x", options=default_options)
     sys.path.insert(0, str(tmp_path))
     try:
         assert main([str(plan), "--module", "boommod", "--flow", "x"]) == 2

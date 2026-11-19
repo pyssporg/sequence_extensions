@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any
 
@@ -71,7 +72,12 @@ def create_app(
         job_timeout=job_timeout,
     )
 
-    app = FastAPI(title="sequence_extensions GUI", version=__version__)
+    @asynccontextmanager
+    async def _lifespan(_app: FastAPI) -> AsyncIterator[None]:
+        yield
+        await jobs.shutdown()
+
+    app = FastAPI(title="sequence_extensions GUI", version=__version__, lifespan=_lifespan)
 
     @app.middleware("http")
     async def _no_cache_static(request: Request, call_next):

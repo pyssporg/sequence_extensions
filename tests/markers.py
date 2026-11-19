@@ -10,13 +10,10 @@ from pathlib import Path
 
 LEVEL_MARKERS = frozenset(
     {
-        "level_static",
         "level_unit",
         "level_component",
-        "level_contract",
         "level_integration",
         "level_system",
-        "level_acceptance",
     }
 )
 
