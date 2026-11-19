@@ -7,6 +7,12 @@ mini flow engine on dependency-graph futures: deterministic parallel campaigns,
 local or at HPC — retries, timeouts, and a JSON-lines run log that is the
 executed truth of every run.
 
+<p align="center">
+  <img src="docs/assets/gui.png" width="1000" alt="sequence_extensions flow studio: the flow_runner campaign dependency graph, node parameters, and streamed run log after a successful Execute">
+</p>
+
+<p align="center"><em>Evaluate builds the dependency graph and plan; Execute runs it and streams the run log — see <a href="docs/gui.md">docs/gui.md</a>.</em></p>
+
 The package is organized into three subpackages plus the CLI:
 
 ```
