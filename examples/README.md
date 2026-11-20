@@ -292,7 +292,7 @@ flows in flows:
   summarize — Fan in the evaluations into one verdict.
 flow campaign: ok (20 ms)
 log: _out/runs/campaign-20261022T072729-b295323b.jsonl
-result: {"cases": 4, "passed": 2, "mean": 1.565}
+result: {"cases": 2, "passed": 2, "mean": 1.73}
 ```
 
 Worth noticing:

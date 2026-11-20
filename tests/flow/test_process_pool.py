@@ -8,6 +8,7 @@ inside a process worker, and the wall-time gain on CPU-bound work.
 
 from __future__ import annotations
 
+import os
 import pickle
 import time
 from concurrent.futures import ThreadPoolExecutor
@@ -478,6 +479,15 @@ def test_process_pool_shared_across_two_runs(tmp_path):
 # ---------------------------------------------------------------- #
 @pytest.mark.flaky_timing
 def test_process_pool_beats_gil_on_cpu_bound_work(tmp_path):
+    # Two workers need two cores; the driver needs a third to dispatch and
+    # join without contending with them.
+    available_cpus = getattr(os, "process_cpu_count", os.cpu_count)() or 1
+    if available_cpus < 3:
+        pytest.skip(
+            "two-worker CPU-bound speedup needs at least 3 available CPUs "
+            f"(two workers plus the driver); found {available_cpus}"
+        )
+
     n = 3_000_000
     t0 = time.perf_counter()
     baseline = _burn(n)
