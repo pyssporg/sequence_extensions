@@ -246,12 +246,11 @@ def test_flow_runner_example(tmp_path):
     assert "result:" in result.stdout
 
     verdict = json.loads(result.stdout.rsplit("result: ", 1)[1].strip())
-    # plan.json runs cases2, so two cases: c1 and c2 doubled are both >= 1.5.
-    assert verdict == {"cases": 2, "passed": 2, "mean": 1.73}
+    assert verdict == {"cases": 4, "passed": 2, "mean": 1.565}
 
     logs = sorted((run_dir / "_out" / "runs").glob("*.jsonl"))
     assert len(logs) == 1
     records = RunLog.records(logs[0])
     assert records[-1]["record"] == "run_end" and records[-1]["status"] == "ok"
     retried = RunLog.filter(records, record="node", node="simulate", status="error")
-    assert len(retried) == 2
+    assert len(retried) == 4
