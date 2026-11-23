@@ -4,27 +4,30 @@ Runnable programs that tour `sequence_extensions`, one per aspect. Each is a
 standalone script with a `main()` function; `tests/usage_examples/` executes
 them as part of `pytest`, so the examples cannot drift from the library.
 
-Run them from the repository root:
+Run them from the workspace root (in a standalone checkout, drop the
+`repos/sequence_extensions/` prefix):
 
 ```bash
-python examples/sequences.py
-python examples/graph_futures.py
-python examples/campaign.py --out /tmp/campaign
-python examples/policies.py --out /tmp/policies
-python examples/run_log.py --out /tmp/run-log
-python examples/plan_workflow/plan_workflow.py
-python examples/process_pool.py --out /tmp/process-pool
+python repos/sequence_extensions/examples/sequences.py
+python repos/sequence_extensions/examples/graph_futures.py
+python repos/sequence_extensions/examples/campaign.py
+python repos/sequence_extensions/examples/policies.py
+python repos/sequence_extensions/examples/run_log.py
+python repos/sequence_extensions/examples/plan_workflow/plan_workflow.py
+python repos/sequence_extensions/examples/process_pool.py
 
-cd examples/flow_runner
-flow-runner plan.json --module flows --flow campaign --log _out/runs
+cd repos/sequence_extensions/examples/flow_runner
+flow-runner plan.json --module flows --flow campaign --log build/examples/flow-runner/logs
 ```
 
-The file-writing scripts accept `--out` (default `examples/_out/<name>`).
-That output is scratch: it is gitignored, and a fresh `--out` directory gives
-a clean rerun. `plan_workflow.py` is the exception: its artifacts are
-committed next to it, under `plan_workflow/artifacts/`, so rerunning
-regenerates them in place. Nothing here needs a network, a simulator
-install, or a service.
+The file-writing scripts accept one optional `--out` (default
+`build/examples/<name>`). That output is scratch: it is gitignored, and a
+fresh `--out` directory gives a clean rerun. `plan_workflow.py` is the
+exception: its artifacts are committed next to it, under
+`plan_workflow/artifacts/`, so rerunning regenerates them in place. Nothing
+here needs a network, a simulator install, or a service. Output blocks below
+show a real run; run ids, timestamps, durations, and worker names differ on
+every run.
 
 | Example | What it shows |
 | --- | --- |
@@ -44,7 +47,7 @@ sliding window, reduce, convert columns to a dict, and read one pair through
 `KeyValueTuple`.
 
 ```bash
-python examples/sequences.py
+python repos/sequence_extensions/examples/sequences.py
 ```
 
 ```text
@@ -79,7 +82,7 @@ Build a diamond (`base` → `left` / `right` → `total`), chain a node that
 returns another future, and handle the two failure modes of a future pool.
 
 ```bash
-python examples/graph_futures.py
+python repos/sequence_extensions/examples/graph_futures.py
 ```
 
 ```text
@@ -110,7 +113,7 @@ evaluation onto each, and fan in one verdict. Each case fails its first
 attempt, so the log shows the retry policy in action.
 
 ```bash
-python examples/campaign.py --out /tmp/campaign
+python repos/sequence_extensions/examples/campaign.py
 ```
 
 ```text
@@ -118,7 +121,7 @@ status:  ok
 result:  {'cases': 4, 'passed': 2, 'mean_score': 0.78}
 attempt: 1, duration_ms: 25
 retried: 4 simulate attempts (one per case)
-log:     /tmp/campaign/runs/campaign-20261022T072726-69304af3.jsonl
+log:     build/examples/campaign/runs/campaign-<timestamp>-<hash>.jsonl
 nodes:   [['campaign', 'count_cases'], ['campaign', 'simulate'], ['campaign', 'evaluate'], ['campaign', 'summarize'], ['campaign']]
 ```
 
@@ -144,7 +147,7 @@ Worth noticing:
 Six small runs, each isolating one policy.
 
 ```bash
-python examples/policies.py --out /tmp/policies
+python repos/sequence_extensions/examples/policies.py
 ```
 
 ```text
@@ -177,7 +180,7 @@ Worth noticing:
 Run the same flow twice in reference mode, then read the log back.
 
 ```bash
-python examples/run_log.py --out /tmp/run-log
+python repos/sequence_extensions/examples/run_log.py
 ```
 
 ```text
@@ -211,16 +214,16 @@ Plan the flow first, inspect and edit the JSON document, then execute that
 document.
 
 ```bash
-python examples/plan_workflow/plan_workflow.py
+python repos/sequence_extensions/examples/plan_workflow/plan_workflow.py
 ```
 
 ```text
 nodes:     ['score', 'score', 'score', 'gather', 'total']
-plan:      examples/plan_workflow/artifacts/plan.json
+plan:      repos/sequence_extensions/examples/plan_workflow/artifacts/plan.json
 diff:      ['scale: 1.0 -> 2.0', 'scale: 1.0 -> 2.0', 'scale: 1.0 -> 2.0']
 status:  ok
 result:  {'count': 3, 'total': 24.0}
-log:     examples/plan_workflow/artifacts/logs/campaign-fixed.jsonl
+log:     repos/sequence_extensions/examples/plan_workflow/artifacts/logs/campaign-fixed.jsonl
 records: 7
 ```
 
@@ -231,6 +234,8 @@ stripped), `plan.override.json` (after `apply_override`), `diff.json` (what
 changed), `cases/` (the inputs), and `logs/campaign-fixed.jsonl` (the run
 log).  Rerunning regenerates them in place; `fixed_clock` pins the run id so
 the log is byte-identical on every rerun.  `--out` overrides the location.
+The paths above are as printed from the workspace root; a standalone
+checkout prints them without the `repos/sequence_extensions/` prefix.
 
 Worth noticing:
 
@@ -252,14 +257,14 @@ Worth noticing:
 The same node graph, but workers are processes instead of threads.
 
 ```bash
-python examples/process_pool.py --out /tmp/process-pool
+python repos/sequence_extensions/examples/process_pool.py
 ```
 
 ```text
 status:  ok
 results: [21333253333400000, 21333253333400000, 21333253333400000, 21333253333400000]
 workers: ['proc-ForkProcess-1', 'proc-ForkProcess-2']
-log:     /tmp/process-pool/runs/cpu_campaign-20261022T072728-e88fd2ef.jsonl
+log:     build/examples/process-pool/runs/cpu_campaign-<timestamp>-<hash>.jsonl
 ```
 
 Worth noticing:
@@ -279,9 +284,9 @@ Worth noticing:
 One module of nodes plus a `flow-plan/2` JSON document; no driver script.
 
 ```bash
-cd examples/flow_runner
+cd repos/sequence_extensions/examples/flow_runner
 flow-runner plan.json --module flows --list
-flow-runner plan.json --module flows --flow campaign --log _out/runs
+flow-runner plan.json --module flows --flow campaign --log build/examples/flow-runner/logs
 ```
 
 ```text
@@ -290,8 +295,8 @@ flows in flows:
   evaluate  — Compare one simulated value to the tolerance.
   simulate  — Double the case value; fail once per case to exercise retries.
   summarize — Fan in the evaluations into one verdict.
-flow campaign: ok (20 ms)
-log: _out/runs/campaign-20261022T072729-b295323b.jsonl
+flow campaign: ok (1021 ms)
+log: build/examples/flow-runner/logs/campaign-<timestamp>-<hash>.jsonl
 result: {"cases": 4, "passed": 2, "mean": 1.565}
 ```
 

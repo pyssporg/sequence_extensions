@@ -16,7 +16,7 @@ one error and one success per case.
 
 Run::
 
-    python examples/campaign.py --out /tmp/campaign
+    python repos/sequence_extensions/examples/campaign.py
 """
 
 from __future__ import annotations
@@ -129,7 +129,7 @@ def campaign(cases_dir: Path, out_dir: Path, tolerance: float = 0.75) -> dict:
 
 def main(argv: list[str] | None = None) -> dict:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--out", type=Path, default=Path("examples/_out/campaign"))
+    parser.add_argument("--out", type=Path, default=Path("build/examples/campaign"))
     parser.add_argument("--workers", type=int, default=4)
     args = parser.parse_args(argv)
 

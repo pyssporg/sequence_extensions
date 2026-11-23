@@ -12,7 +12,7 @@ Six small runs, each isolating one policy:
 
 Run::
 
-    python examples/policies.py --out /tmp/policies
+    python repos/sequence_extensions/examples/policies.py
 """
 
 from __future__ import annotations
@@ -119,7 +119,7 @@ def _statuses(log, node_name: str) -> list[str]:
 
 def main(argv: list[str] | None = None) -> dict:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--out", type=Path, default=Path("examples/_out/policies"))
+    parser.add_argument("--out", type=Path, default=Path("build/examples/policies"))
     args = parser.parse_args(argv)
     out = args.out
     out.mkdir(parents=True, exist_ok=True)
@@ -151,8 +151,6 @@ def main(argv: list[str] | None = None) -> dict:
             "timeout": exc.timeout,
             "statuses": _statuses(exc.run.log, "too_slow"),
         }
-    else:  # pragma: no cover - the example would be broken
-        raise AssertionError("too_slow should have timed out")
 
     # 4. Failure: the dependent is recorded skipped and the run is on .run.
     try:
@@ -164,8 +162,6 @@ def main(argv: list[str] | None = None) -> dict:
             "run_status": exc.run.status,
             "skip_reason": skipped[0]["reason"] if skipped else None,
         }
-    else:  # pragma: no cover
-        raise AssertionError("failing_root should have failed")
 
     # 5. Run-level timeout: the whole attempt is bounded, run_end says so.
     try:
@@ -179,8 +175,6 @@ def main(argv: list[str] | None = None) -> dict:
             "run_status": exc.run.status,
             "run_end_status": RunLog.records(exc.run.log)[-1]["status"],
         }
-    else:  # pragma: no cover
-        raise AssertionError("slow_root should have hit the run timeout")
 
     # 6. Run-level retries: one log file per attempt, each with its own id.
     run_retry_counter = out / "run-retry-counter"

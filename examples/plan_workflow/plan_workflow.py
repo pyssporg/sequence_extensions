@@ -22,7 +22,7 @@ can open them and see the documents the flow produced:
 
 Run::
 
-    python examples/plan_workflow/plan_workflow.py
+    python repos/sequence_extensions/examples/plan_workflow/plan_workflow.py
 """
 
 from __future__ import annotations
@@ -90,6 +90,14 @@ def campaign(cases_dir: Path) -> dict:
     return total.submit(gather(scores))
 
 
+def _display(path: Path) -> Path:
+    """Print a path relative to the caller's directory when it is below it."""
+    try:
+        return path.relative_to(Path.cwd())
+    except ValueError:
+        return path
+
+
 def main(argv: list[str] | None = None) -> dict:
     parser = argparse.ArgumentParser(description=__doc__)
     #: The artifacts live next to the example, committed, so rerunning
@@ -112,12 +120,7 @@ def main(argv: list[str] | None = None) -> dict:
         options=RunOptions(fixed_clock=True),
     )
     print(f"nodes:     {[entry['name'] for entry in document['nodes']]}")
-    plan_path = args.out / "plan.json"
-    try:
-        plan_path = plan_path.relative_to(Path.cwd())
-    except ValueError:
-        pass
-    print(f"plan:      {plan_path}")
+    print(f"plan:      {_display(args.out / 'plan.json')}")
 
     # 2. Full JSON document; Path values become {path, sha256} via jsonable.
     _write_json(args.out / "plan.json", jsonable(document))
@@ -141,7 +144,7 @@ def main(argv: list[str] | None = None) -> dict:
 
     print(f"status:  {run.status}")
     print(f"result:  {run.result}")
-    print(f"log:     {run.log}")
+    print(f"log:     {_display(run.log)}")
     print("records: ", len(list(RunLog.records(run.log))))
 
     return {

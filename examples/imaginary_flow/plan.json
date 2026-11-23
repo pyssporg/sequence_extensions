@@ -15,9 +15,9 @@
       "name": "out_dir",
       "type": "Path",
       "required": false,
-      "default": "_out",
+      "default": "build/examples/imaginary-flow",
       "value": {
-        "path": "_out",
+        "path": "build/examples/imaginary-flow",
         "sha256": null
       }
     }
@@ -54,7 +54,7 @@
           "required": true,
           "default": null,
           "value": {
-            "path": "_out",
+            "path": "build/examples/imaginary-flow",
             "sha256": null
           }
         }

@@ -7,7 +7,7 @@ and the payload is plain data.
 
 Run::
 
-    python examples/process_pool.py --out /tmp/process-pool
+    python repos/sequence_extensions/examples/process_pool.py
 """
 
 from __future__ import annotations
@@ -42,7 +42,7 @@ def cpu_campaign(sizes: list[int]) -> list[int]:
 
 def main(argv: list[str] | None = None) -> dict:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--out", type=Path, default=Path("examples/_out/process-pool"))
+    parser.add_argument("--out", type=Path, default=Path("build/examples/process-pool"))
     parser.add_argument("--size", type=int, default=400_000)
     args = parser.parse_args(argv)
 

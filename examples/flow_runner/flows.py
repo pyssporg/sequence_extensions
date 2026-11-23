@@ -68,7 +68,11 @@ def summarize(evaluations: list[dict]) -> dict:
 
 
 @node
-def campaign(cases_dir: Path, out_dir: Path = "out", tolerance: float = 1.5) -> dict:
+def campaign(
+    cases_dir: Path,
+    out_dir: Path = "build/examples/flow-runner",
+    tolerance: float = 1.5,
+) -> dict:
     """Run every case through simulate and evaluate; return one verdict."""
     # The plan loader decodes typed paths; normalize defensively for callers.
     cases_dir = Path(cases_dir)

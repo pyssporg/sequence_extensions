@@ -7,7 +7,7 @@ is read back with ``records``, ``filter``, and ``summarize``.
 
 Run::
 
-    python examples/run_log.py --out /tmp/run-log
+    python repos/sequence_extensions/examples/run_log.py
 """
 
 from __future__ import annotations
@@ -32,7 +32,7 @@ def collect(values: list[int]) -> dict:
 
 def main(argv: list[str] | None = None) -> dict:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--out", type=Path, default=Path("examples/_out/run-log"))
+    parser.add_argument("--out", type=Path, default=Path("build/examples/run-log"))
     args = parser.parse_args(argv)
 
     values = list(range(6))

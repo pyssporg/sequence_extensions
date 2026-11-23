@@ -103,7 +103,10 @@ def postprocess(sim_path: Path, threshold: float = 0.1) -> dict:
 
 
 @node
-def pipeline(raw_path: Path = "data/raw_measurements.csv", out_dir: Path = "_out") -> dict:
+def pipeline(
+    raw_path: Path = "data/raw_measurements.csv",
+    out_dir: Path = "build/examples/imaginary-flow",
+) -> dict:
     """Run prepare -> simulate -> post-process and return the report."""
     prepared = prepare_data.submit(Path(raw_path), Path(out_dir))
     simulated = simulate.submit(prepared)
