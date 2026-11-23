@@ -198,8 +198,9 @@ its tests):
 pip install -e ".[dev,gui]"
 ```
 
-Run the suite with `pytest` (the 90% coverage floor is enforced on the engine;
-the GUI suite is excluded from it) and lint with `ruff check .`. See
+Run the suite with `pytest`; the engine's 90% coverage floor is enforced by the
+coverage run (`pytest tests --ignore=tests/gui --cov=sequence_extensions`), and
+the GUI suite is excluded from that floor. Lint with `ruff check .`. See
 [CONTRIBUTING.md](CONTRIBUTING.md) for the full test, coverage, lint, and format
 commands.
 
