@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.2.0] - 2026-11-24
+
+### Added
+
+- **Headless one-shot run API.** `sequence_extensions.flow_runner.headless`
+  exposes `run_flow` plus `load_flow_module`, `select_flow`,
+  `require_plan_document`, and `HeadlessRun`, re-exported from
+  `sequence_extensions.flow_runner`. Both frontends are thin adapters over this
+  single unit: it loads the module, selects the flow, gates the plan against
+  `flow-plan/2`, and runs it, so the CLI and the GUI no longer re-derive module
+  loading, flow selection, or run projection.
+
+- **Local offline GUI.** A `seq_ext_gui` package and a `seq-ext-gui` console
+  script provide a local web UI for previewing and running flow plans. The GUI
+  is available through the optional `gui` extra; the engine remains a plain
+  dependency with no GUI packages required.
+
 ### Fixed
 
 - **Caller-owned pools drain when the root node fails.** Every failed run set
