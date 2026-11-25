@@ -38,7 +38,13 @@ jobs:
       - name: Smoke test the wheel
         run: |
           python -m venv /tmp/smoke
-          /tmp/smoke/bin/pip install "dist/*.whl[gui]"
+          shopt -s nullglob
+          wheels=(dist/*.whl)
+          if [ "${#wheels[@]}" -ne 1 ]; then
+            echo "Expected exactly one wheel in dist/, found ${#wheels[@]}." >&2
+            exit 1
+          fi
+          /tmp/smoke/bin/pip install "${wheels[0]}[gui]"
           /tmp/smoke/bin/flow-runner --help
           /tmp/smoke/bin/seq-ext-gui --help
           /tmp/smoke/bin/python -c "from importlib.resources import files; assert (files('seq_ext_gui') / 'static' / 'index.html').is_file(); assert (files('sequence_extensions') / 'schemas' / 'flow-plan-2.schema.json').is_file()"
